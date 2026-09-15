@@ -209,8 +209,11 @@ Alle Header haben bereits `extern "C"`-Guards. Die Ursache ist allein die C-Synt
 |---|---|---|
 | F2 | [geisten/geist-diktat#50](https://github.com/geisten/geist-diktat/pull/50) | offen, wartet auf Review |
 | F1 | geistlib (ASan x86) | in Arbeit |
-| F3 | geistshell (Engine v0.11.0, Pin, Race) | in Arbeit |
-| F6a | geistlib (Modell-Revisionen und SHA-256) | in Arbeit |
+| F3 | [geisten/geistshell#148](https://github.com/geisten/geistshell/pull/148) | offen, wartet auf Review: API v0.11.0, SHA-Pin, Gitlink weg, `scripts/sync-engine.sh`, Race behoben (vorher 3/3 fehlgeschlagen, jetzt 3/3 grün) |
+| F6a | [geisten/geistlib#413](https://github.com/geisten/geistlib/pull/413) | offen, wartet auf Review: BitNet, Qwen3.5, Qwen3 und SmolLM2 per HF-Revision und SHA-256 |
+| C1–C5 | geistkit `ci/actions` (CI-Matrix Linux/arm64/amd-desktop/Pi 5/macOS) | in Arbeit |
+
+**Runner:** `geisten_amd_nvidea-gk` ist für geistkit registriert (`~/actions-runner-geistkit`). Der Dienst muss noch mit sudo installiert werden. Pi 5: ab 18.09. eine eigene geistkit-Runner-Instanz registrieren, dann die Repo-Variable `PI5_RUNNER=on` setzen.
 
 **Nach jedem Merge:** SHA in `versions.mk` nachziehen und die Vorgaben in `acceptance.tsv` verschärfen.
 
