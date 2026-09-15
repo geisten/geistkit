@@ -153,6 +153,16 @@ Alle Header haben bereits `extern "C"`-Guards. Die Ursache ist allein die C-Synt
 - [ ] macOS-Intel-Job in der geistlib-CI. Heute fehlt er. geist-memory baut die Engine ohne `-Werror`, deshalb fiel der Fehler dort nicht auf.
 - **geistkit danach:** In `acceptance.d/darwin-x86_64.tsv` die gemessenen Zähler eintragen.
 
+### F9 – geist-diktat: quality-audit `contracts` auf main rot (Repo geist-diktat), gefunden bei der Prüfung von #50
+
+Nachgestellt mit `tests/ubuntu.Dockerfile`, ohne Netz. Die Fehler sind auf `origin/main` und im PR-Branch identisch. Der Workflow läuft nur bei PRs auf bestimmte Pfade, deshalb gab es auf main nie einen roten Lauf. Befund: [#50, Kommentar](https://github.com/geisten/geist-diktat/pull/50#issuecomment-5686026515).
+
+- [ ] `test_nvim_callback_contracts`: „PASS complete Unicode line“ schlägt fehl (nvim 0.9.5 im Image)
+- [ ] `test_nvim_real_fragmented_process`: Ergebnis „hel lo “ statt „hello “
+- [ ] `tests/ibus_lifecycle.c`: „stopped child already reaped“ und „natural exit clears pid for restart“. Mit und ohne `-D_GNU_SOURCE`, also nicht das `strnlen`-Muster.
+- [ ] quality-audit zusätzlich bei Push auf main laufen lassen, damit main nicht unbemerkt rot wird
+- **geistkit:** Später `make test-ubuntu` als eigenen Container-Schritt aufnehmen (GTK/Qt/IBus unter Xvfb). Heute nicht Teil der Pipeline.
+
 ### Plattform-Befunde aus geistkit#1 (15.09.)
 
 | Profil | Runner | geistlib unit | geistshell | Rot durch |
@@ -227,11 +237,14 @@ Alle Header haben bereits `extern "C"`-Guards. Die Ursache ist allein die C-Synt
 
 | Fix | PR | Status |
 |---|---|---|
-| F2 | [geisten/geist-diktat#50](https://github.com/geisten/geist-diktat/pull/50) | offen, wartet auf Review |
+| F2 | [geisten/geist-diktat#50](https://github.com/geisten/geist-diktat/pull/50) | offen, wartet auf Review. quality-audit `contracts` bleibt rot, war aber schon auf main rot (→ F9) |
 | F1 | [geisten/geistlib#414](https://github.com/geisten/geistlib/pull/414) | offen, wartet auf Review: nur Tests, CI und Doku; ASan x86 40/24/0 mit `detect_leaks=1`; neuer CI-Job `asan-x86_64` |
 | F3 | [geisten/geistshell#148](https://github.com/geisten/geistshell/pull/148) | offen, wartet auf Review: API v0.11.0, SHA-Pin, Gitlink weg, `scripts/sync-engine.sh`, Race behoben (vorher 3/3 fehlgeschlagen, jetzt 3/3 grün) |
-| F6a | [geisten/geistlib#413](https://github.com/geisten/geistlib/pull/413) | offen, wartet auf Review: BitNet, Qwen3.5, Qwen3 und SmolLM2 per HF-Revision und SHA-256 |
-| C1–C5 | geistkit `ci/actions` (CI-Matrix Linux/arm64/amd-desktop/Pi 5/macOS) | in Arbeit |
+| F6a | [geisten/geistlib#413](https://github.com/geisten/geistlib/pull/413) | offen, wartet auf Review: BitNet, Qwen3.5, Qwen3 und SmolLM2 per HF-Revision und SHA-256. Dazu `8668bbb`: coverage-Job lädt Gemma nach, statt sich auf den Cache zu verlassen (Cache 8,4 von 10 GB, pro PR 3 GB). Vulkan-GPU-Job rot durch Infrastruktur |
+| F8 | [geisten/geistlib#415](https://github.com/geisten/geistlib/pull/415) | offen, wartet auf Review. macOS-Intel-Job grün. Umfang größer als geplant, 6 Commits: `hw_probe.c`; mac-Targets auf x86_64 mit `cpu_x86`; CI-Leg `macos-15-intel`; clang-x86-Fixes in `audio_linear.c` (VNNI), `ptqtp_kernel.c`, `elementwise.c`. Nachweise nach §6: bitgleich, Opcode-Folgen gleich, Laufzeit im Rauschen |
+| C1–C5 | [geisten/geistkit#1](https://github.com/geisten/geistkit/pull/1) | offen. 2. Lauf: macOS arm64 grün, übrige Legs rot nur durch F1, F2, F8 |
+
+**Gehostete x86-Runner:** Der CPU-Pool ist gemischt, mal mit, mal ohne AVX-512. Die Profil-Erkennung wählt pro Lauf `linux-x86_64` oder `linux-x86_64-avx512`, beide Profile werden gebraucht.
 
 **Runner:** `geisten_amd_nvidea-gk` ist für geistkit registriert (`~/actions-runner-geistkit`). Der Dienst muss noch mit sudo installiert werden. Pi 5: ab 18.09. eine eigene geistkit-Runner-Instanz registrieren, dann die Repo-Variable `PI5_RUNNER=on` setzen.
 
