@@ -57,10 +57,12 @@ test-geistshell:
 
 # deps and check-repro without -j: both race under -j (check-engine before the stamp; check-repro.sh inherits MAKEFLAGS).
 MEMORY_MAKE = $(MAKE) CC=$(CC) GEIST_REPO=$(ENGINE) GEIST_REV=$(ENGINE_geist-memory)
+# test-model-alloc/test-tokenizer-oom link with GNU ld --wrap; Apple ld has none. geist-memory's own macOS CI omits them too.
+MEMORY_ASAN := check fuzz $(if $(filter Darwin,$(shell uname -s)),,test-model-alloc test-tokenizer-oom)
 test-geist-memory:
 	$(RUN) geist-memory.deps    $(DEPS)/geist-memory $(MEMORY_MAKE) deps check-deps
 	$(RUN) geist-memory.check   $(DEPS)/geist-memory $(MEMORY_MAKE) -j$(JOBS) check
-	$(RUN) geist-memory.asan    $(DEPS)/geist-memory $(MEMORY_MAKE) -j$(JOBS) MODE=asan check fuzz test-model-alloc test-tokenizer-oom
+	$(RUN) geist-memory.asan    $(DEPS)/geist-memory $(MEMORY_MAKE) -j$(JOBS) MODE=asan $(MEMORY_ASAN)
 	$(RUN) geist-memory.install $(DEPS)/geist-memory $(MEMORY_MAKE) -j$(JOBS) check-linkage check-install example
 	$(RUN) geist-memory.repro   $(DEPS)/geist-memory $(MEMORY_MAKE) check-repro
 	$(RUN) geist-memory.analyze $(DEPS)/geist-memory $(MEMORY_MAKE) -j$(JOBS) CC=$(ANALYZE_CC) analyze
@@ -74,13 +76,21 @@ test-geist-diktat:
 selftest:
 	sh test/verify_test.sh
 
+# Counts depend on the platform, so requirements are acceptance.tsv (all platforms) plus
+# acceptance.d/$(PROFILE).tsv. Profile = os-arch, plus -avx512 where geistlib's AVX-512
+# kernels can run (F/BW/DQ/VL; test_q4kx8_gemm_unit skips otherwise). No profile file, no pass.
+AVX512  := $(shell for f in avx512f avx512bw avx512dq avx512vl; do grep -qw $$f /proc/cpuinfo 2>/dev/null || exit 1; done && echo -avx512)
+PROFILE ?= $(shell uname -s | tr A-Z a-z)-$(shell uname -m)$(AVX512)
+
 verify: selftest
+	@test -f acceptance.d/$(PROFILE).tsv || { echo "no requirements for profile $(PROFILE): acceptance.d/$(PROFILE).tsv missing"; exit 1; }
 	rm -rf build/results build/logs
 	mkdir -p build
-	{ uname -a; $(CC) --version; $(ANALYZE_CC) --version; cat /toolchain.txt 2>/dev/null; } >build/toolchain.txt 2>&1 || true
+	{ echo "profile $(PROFILE)"; uname -a; $(CC) --version; $(ANALYZE_CC) --version; cat /toolchain.txt 2>/dev/null; } >build/toolchain.txt 2>&1 || true
 	$(MAKE) test
 	cat build/results/*.tsv >build/results.tsv
-	sh tools/verify.sh build/results.tsv acceptance.tsv >build/verify.txt; rc=$$?; cat build/verify.txt; exit $$rc
+	cat acceptance.tsv acceptance.d/$(PROFILE).tsv >build/acceptance.tsv
+	{ echo "profile $(PROFILE)"; sh tools/verify.sh build/results.tsv build/acceptance.tsv; } >build/verify.txt; rc=$$?; cat build/verify.txt; exit $$rc
 
 image:
 	docker build -t $(IMAGE) .

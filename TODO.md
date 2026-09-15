@@ -146,6 +146,26 @@ Alle Header haben bereits `extern "C"`-Guards. Die Ursache ist allein die C-Synt
 - [ ] **F6c (geistkit)** Modelle mit URL und SHA-256 in `versions.mk`, `make fetch-models`, Cache in Actions über den SHA als Schlüssel
 - [ ] **F6d (geistkit)** Profil „model“ (nächtlich): Zähler je Modell in `acceptance.tsv`, als Ratsche
 
+### F8 – geistlib auf macOS Intel (Repo geistlib), gefunden durch geistkit#1
+
+- [ ] `src/base/hw_probe.c:58`: `sysctl_bool` ist unter `__APPLE__` definiert, wird aber nur im aarch64-Zweig benutzt (Z. 135/136). Auf `macos-15-intel` bricht der Build mit Apple clang 17 und mit llvm@19 an `-Werror,-Wunused-function` ab.
+  - **Fix:** Die Definition genauso bedingen wie die Nutzung.
+- [ ] macOS-Intel-Job in der geistlib-CI. Heute fehlt er. geist-memory baut die Engine ohne `-Werror`, deshalb fiel der Fehler dort nicht auf.
+- **geistkit danach:** In `acceptance.d/darwin-x86_64.tsv` die gemessenen Zähler eintragen.
+
+### Plattform-Befunde aus geistkit#1 (15.09.)
+
+| Profil | Runner | geistlib unit | geistshell | Rot durch |
+|---|---|---|---|---|
+| `linux-x86_64-avx512` | amd-desktop (lokal) | 40 / 24 / 0 | 61 / 1 / 0 | F1 (ASan), F2 (Audit) |
+| `linux-x86_64` | ubuntu-24.04 | 39 / 25 / 0 (ohne AVX-512) | 61 / 1 / 0 | F1, F2 |
+| `linux-aarch64` | ubuntu-24.04-arm | 31 / 23 / 0, ASan 31 / 23 / 0 | 61 / 1 / 0 | F2 |
+| `darwin-arm64` | macos-15, beide Compiler | 31 / 23 / 0, ASan 31 / 23 / 0 | 60 / 2 / Host-Skip 1 (von geistshell erlaubt) | – nach geistkit-Fix |
+| `darwin-x86_64` | macos-15-intel, beide Compiler | baut nicht | Folgefehler | F8 |
+
+- **geistkit-Fix (kein Upstream-Defekt):** Die ASan-Targets `test-model-alloc` und `test-tokenizer-oom` von geist-memory brauchen GNU ld `--wrap`. geistkit lässt sie auf Darwin weg, wie die macOS-CI von geist-memory selbst.
+- **Infrastruktur:** Der Job „Vulkan backend (discrete GPU)“ in geistlib ist in allen PRs rot. Auf amd-desktop passen NVIDIA-Kernel-Modul (595.84) und Userspace (595.91) nicht zusammen. **Neustart des Rechners nötig.**
+
 ### F7 – Upstream-Hygiene
 
 - [ ] geist-memory: nächtlicher Lauf mit echtem Modell scheitert seit 5 Nächten am Modell-Download
@@ -208,7 +228,7 @@ Alle Header haben bereits `extern "C"`-Guards. Die Ursache ist allein die C-Synt
 | Fix | PR | Status |
 |---|---|---|
 | F2 | [geisten/geist-diktat#50](https://github.com/geisten/geist-diktat/pull/50) | offen, wartet auf Review |
-| F1 | geistlib (ASan x86) | in Arbeit |
+| F1 | [geisten/geistlib#414](https://github.com/geisten/geistlib/pull/414) | offen, wartet auf Review: nur Tests, CI und Doku; ASan x86 40/24/0 mit `detect_leaks=1`; neuer CI-Job `asan-x86_64` |
 | F3 | [geisten/geistshell#148](https://github.com/geisten/geistshell/pull/148) | offen, wartet auf Review: API v0.11.0, SHA-Pin, Gitlink weg, `scripts/sync-engine.sh`, Race behoben (vorher 3/3 fehlgeschlagen, jetzt 3/3 grün) |
 | F6a | [geisten/geistlib#413](https://github.com/geisten/geistlib/pull/413) | offen, wartet auf Review: BitNet, Qwen3.5, Qwen3 und SmolLM2 per HF-Revision und SHA-256 |
 | C1–C5 | geistkit `ci/actions` (CI-Matrix Linux/arm64/amd-desktop/Pi 5/macOS) | in Arbeit |

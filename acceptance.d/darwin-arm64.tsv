@@ -1,0 +1,10 @@
+# macOS arm64: macos-15, Apple clang 17 and brew llvm@19 (identical results). Counts are a ratchet.
+geistlib.unit.passed             >=  31
+geistlib.unit.skipped            <=  23   # Vulkan unavailable, models/dumps -> F6b
+geistlib.asan.passed             >=  31
+geistlib.asan.skipped            <=  23
+geistshell.test.passed           >=  60
+geistshell.test.skipped          <=  2    # test_cli_gym; test_cli_machine_recovery (below)
+# geistshell's own CI allows host skips on macOS (expect_skips: allowed):
+# test_cli_machine_recovery needs process signals the macOS runner does not provide.
+geistshell.test.host_skipped     <=  1

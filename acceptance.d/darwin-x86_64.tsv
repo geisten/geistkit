@@ -1,0 +1,5 @@
+# macOS Intel: macos-15-intel, Apple clang 17 and brew llvm@19.
+# Red today: geistlib does not build (src/base/hw_probe.c:58 unused sysctl_bool under -Werror) -> F8.
+# The two lines force both suites to run; replace them with the measured counts once F8 is in the lock.
+geistlib.unit.passed             >=  1
+geistshell.test.passed           >=  1

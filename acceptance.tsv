@@ -1,21 +1,10 @@
-# Requirements: key  operator(== <= >=)  value
-# Every step must also exit 0 unless a line here says otherwise (tools/verify.sh).
+# Requirements for EVERY platform: key  operator(== <= >=)  value
+# Platform-dependent counts live in acceptance.d/<profile>.tsv (see Makefile: PROFILE).
+# Every step must also exit 0 unless a line says otherwise (tools/verify.sh).
 # A missing measured value is a failure: a test that did not run does not pass.
-# Counts are a ratchet: passed may only rise, skipped only fall. Tighten after every improvement.
 # Known defects are NOT allowed: the gate stays red until the upstream fix is in the lock (TODO.md, F-plan).
 
-# --- geistlib (v0.11.0, model-free profile)
-geistlib.unit.passed             >=  40
-geistlib.unit.skipped            <=  24   # 24 tests need models/dumps -> TODO P2
 geistlib.unit.failed             ==  0
 geistlib.unit.error              ==  0
-geistlib.asan.failed             ==  0    # red today: ASan build breaks -> F1
+geistlib.asan.failed             ==  0    # x86_64: red until geistlib#414 (F1)
 geistlib.asan.error              ==  0
-
-# --- geistshell (engine v0.10.1 until F3)
-geistshell.test.passed           >=  61
-geistshell.test.skipped          <=  1    # test_cli_gym: no build/gymenv
-geistshell.test.host_skipped     ==  0
-
-# --- geist-diktat (engine v0.11.0)
-# red today: geist-diktat.audit.exit = 2 (strnlen) -> F2
