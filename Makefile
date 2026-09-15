@@ -1,0 +1,86 @@
+# geistkit — fetches the geisten building blocks at locked revisions and
+# builds and verifies them offline.
+#
+#   make fetch    the only step with network: clones at the SHAs from versions.mk, checks tags
+#   make verify   build, test, compare results against acceptance.tsv
+#   make ci       image + fetch, then verify inside the toolchain container WITHOUT network
+#
+# Each consumer gets its engine from build/deps/geistlib (a local clone), at
+# the revision given by ENGINE_<project>, never from the internet at its own pin.
+
+include versions.mk
+
+PROJECTS := geistlib geistshell geist-memory geist-diktat
+DEPS     := $(CURDIR)/build/deps
+ENGINE   := $(DEPS)/geistlib
+# ponytail: fixed at 8. -j32 with ASan builds exhausted memory; raise it once the peak is measured.
+JOBS     ?= 8
+IMAGE    := geistkit-toolchain
+RUN      := sh tools/run.sh
+
+.PHONY: fetch test verify selftest image ci clean FORCE $(addprefix test-,$(PROJECTS))
+
+fetch: $(addprefix fetch-,$(PROJECTS))
+
+# FORCE instead of .PHONY: make does not apply pattern rules to .PHONY targets.
+fetch-%: FORCE
+	sh tools/fetch-dep.sh $* $(REPO_$*) $(SHA_$*)
+	# Remove nested repos: `git clean` keeps them (geistshell deps/geist is even a tracked, orphaned
+	# gitlink) and a stale engine survives the pin. Everything under build/deps is disposable.
+	find build/deps/$* -mindepth 2 -name .git -prune | sed 's|/\.git$$||' | xargs -r rm -rf
+	test '$(TAG_$*)' = - || test "$$(git -C build/deps/$* rev-parse '$(TAG_$*)^{commit}')" = $(SHA_$*)
+
+test: $(addprefix test-,$(PROJECTS))
+
+# Flags as in the respective upstream CI (.github/workflows/ci.yml).
+test-geistlib:
+	$(RUN) geistlib.unit     $(ENGINE) $(MAKE) -j$(JOBS) CC=gcc-14 AUTO_FETCH_MODEL=0 test-unit
+	$(RUN) geistlib.py       $(ENGINE) $(MAKE) test-py
+	$(RUN) geistlib.contract $(ENGINE) $(MAKE) -j$(JOBS) CC=gcc-14 agent-contract-smoke
+	$(RUN) geistlib.asan     $(ENGINE) env ASAN_OPTIONS=detect_leaks=0 $(MAKE) -j$(JOBS) CC=gcc-14 MODE=asan AUTO_FETCH_MODEL=0 test-unit
+
+SHELL_MAKE = $(MAKE) HOST_CC=gcc-14 GEIST_REPO=$(ENGINE) GEIST_REF=$(ENGINE_geistshell)
+# sync-engine as a separate step: under -j, objects compile before the clone lands (geist.h missing).
+test-geistshell:
+	$(RUN) geistshell.engine   $(DEPS)/geistshell $(SHELL_MAKE) sync-engine
+	$(RUN) geistshell.build    $(DEPS)/geistshell $(SHELL_MAKE) -j$(JOBS)
+	$(RUN) geistshell.test     $(DEPS)/geistshell $(SHELL_MAKE) test
+	$(RUN) geistshell.baseline $(DEPS)/geistshell env SPG_BIN=build/host-debug/bin/geistshell sh test/test_cli_baseline.sh
+
+# deps and check-repro without -j: both race under -j (check-engine before the stamp; check-repro.sh inherits MAKEFLAGS).
+MEMORY_MAKE = $(MAKE) CC=gcc-14 GEIST_REPO=$(ENGINE) GEIST_REV=$(ENGINE_geist-memory)
+test-geist-memory:
+	$(RUN) geist-memory.deps    $(DEPS)/geist-memory $(MEMORY_MAKE) deps check-deps
+	$(RUN) geist-memory.check   $(DEPS)/geist-memory $(MEMORY_MAKE) -j$(JOBS) check
+	$(RUN) geist-memory.asan    $(DEPS)/geist-memory $(MEMORY_MAKE) -j$(JOBS) MODE=asan check fuzz test-model-alloc test-tokenizer-oom
+	$(RUN) geist-memory.install $(DEPS)/geist-memory $(MEMORY_MAKE) -j$(JOBS) check-linkage check-install example
+	$(RUN) geist-memory.repro   $(DEPS)/geist-memory $(MEMORY_MAKE) check-repro
+	$(RUN) geist-memory.analyze $(DEPS)/geist-memory $(MEMORY_MAKE) -j$(JOBS) CC=clang-19 analyze
+
+DIKTAT_MAKE = $(MAKE) CC=gcc-14 TARGET=linux GEIST_REPO=$(ENGINE) GEIST_REF=$(ENGINE_geist-diktat)
+test-geist-diktat:
+	$(RUN) geist-diktat.build $(DEPS)/geist-diktat $(DIKTAT_MAKE) -j$(JOBS)
+	$(RUN) geist-diktat.test  $(DEPS)/geist-diktat $(DIKTAT_MAKE) test
+	$(RUN) geist-diktat.audit $(DEPS)/geist-diktat $(DIKTAT_MAKE) test-audit
+
+selftest:
+	sh test/verify_test.sh
+
+verify: selftest
+	rm -rf build/results build/logs
+	$(MAKE) test
+	cat build/results/*.tsv >build/results.tsv
+	sh tools/verify.sh build/results.tsv acceptance.tsv >build/verify.txt; rc=$$?; cat build/verify.txt; exit $$rc
+
+image:
+	docker build -t $(IMAGE) .
+
+# Same path inside the container, so the absolute ENGINE paths match.
+# Fixed name: a killed docker client leaves the container running; the next run removes it first.
+ci: image fetch
+	docker rm -f geistkit-ci >/dev/null 2>&1 || true
+	docker run --rm --name geistkit-ci --network none --memory 24g --user $$(id -u):$$(id -g) -e HOME=/tmp \
+		-v $(CURDIR):$(CURDIR) -w $(CURDIR) $(IMAGE) $(MAKE) verify
+
+clean:
+	rm -rf build
