@@ -157,10 +157,12 @@ Alle Header haben bereits `extern "C"`-Guards. Die Ursache ist allein die C-Synt
 
 Nachgestellt mit `tests/ubuntu.Dockerfile`, ohne Netz. Die Fehler sind auf `origin/main` und im PR-Branch identisch. Der Workflow läuft nur bei PRs auf bestimmte Pfade, deshalb gab es auf main nie einen roten Lauf. Befund: [#50, Kommentar](https://github.com/geisten/geist-diktat/pull/50#issuecomment-5686026515).
 
-- [ ] `test_nvim_callback_contracts`: „PASS complete Unicode line“ schlägt fehl (nvim 0.9.5 im Image)
-- [ ] `test_nvim_real_fragmented_process`: Ergebnis „hel lo “ statt „hello “
-- [ ] `tests/ibus_lifecycle.c`: „stopped child already reaped“ und „natural exit clears pid for restart“. Mit und ohne `-D_GNU_SOURCE`, also nicht das `strnlen`-Muster.
-- [ ] quality-audit zusätzlich bei Push auf main laufen lassen, damit main nicht unbemerkt rot wird
+Genauer Stand: **10 Fehler**, nicht 4. `nvim_contract.lua` scheitert in 8 von 13 Prüfungen, `ibus_lifecycle` in 2 von 12.
+
+- [x] ibus (2 Fehler) und Push-Trigger für quality-audit: [geist-diktat#51](https://github.com/geisten/geist-diktat/pull/51). Child-Watch sammelt den Gruppenleiter ein und setzt `e->pid` zurück, `pipeline_stop` ist idempotent. Nachweis: 12/12, dazu 100 Start/Stop- und 100 EOF-Zyklen ohne übrige Kindprozesse.
+- [ ] nvim (8 Fehler): Produktarbeit, bereits als Issues erfasst. #19 Zeilenpuffer für fragmentierte stdout-Zeilen und getrenntes UTF-8 (`lua/geist-diktat/init.lua:62`), #20 Sitzungsgeneration statt einem `job`-Handle, #24 Commandline-Queue und verschluckte Fehler.
+- [ ] Nirgends erfasst: „binary path shell-quoted“. `init.lua:34` maskiert `model`, aber nicht `binary`. Issue anlegen?
+- **Folge:** `contracts` bleibt rot, bis #19, #20 und #24 behoben sind. Durch den neuen Push-Trigger ist das auf main sichtbar.
 - **geistkit:** Später `make test-ubuntu` als eigenen Container-Schritt aufnehmen (GTK/Qt/IBus unter Xvfb). Heute nicht Teil der Pipeline.
 
 ### Plattform-Befunde aus geistkit#1 (15.09.)
