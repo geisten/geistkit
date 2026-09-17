@@ -178,6 +178,15 @@ Genauer Stand: **10 Fehler**, nicht 4. `nvim_contract.lua` scheitert in 8 von 13
 - **geistkit-Fix (kein Upstream-Defekt):** Die ASan-Targets `test-model-alloc` und `test-tokenizer-oom` von geist-memory brauchen GNU ld `--wrap`. geistkit lässt sie auf Darwin weg, wie die macOS-CI von geist-memory selbst.
 - **Infrastruktur:** Der Job „Vulkan backend (discrete GPU)“ in geistlib ist in allen PRs rot. Auf amd-desktop passen NVIDIA-Kernel-Modul (595.84) und Userspace (595.91) nicht zusammen. **Neustart des Rechners nötig.**
 
+### F10 – geistlib: Cache-Politik für Modelle (Repo geistlib)
+
+Gemessen am 17.09.: **9,5 von 10 GB belegt, 46 Einträge.** Jeder PR legt eine eigene Kopie an: Gemma 2,8 GB je PR (#416, #417), Qwen3 0,57 GB je PR (#415, #416, #417), SmolLM2 0,34 GB je PR. Für `main` gibt es **keine** Gemma-Kopie mehr. Folge: Jobs werden ohne Codefehler rot, siehe #413, #414, #417.
+
+- [ ] Modell-Caches nur auf `main` schreiben, PRs nur lesen (`actions/cache/restore` mit `lookup-only`/`restore-keys`, `actions/cache/save` nur bei Push auf main)
+- [ ] Alternativ oder zusätzlich: Modelle nicht cachen, sondern über den SHA-256-Pin aus F6a frisch laden (Gemma 3,1 GB in etwa 30 s gemessen)
+- [ ] Sofortmaßnahme durch den User: alte PR-Caches löschen, `gh cache list -R geisten/geistlib`, dann `gh cache delete <key>`
+- **Zusammenhang:** #413 behebt nur die Folge (Fetch-Schritt), nicht die Ursache.
+
 ### F7 – Upstream-Hygiene
 
 - [ ] geist-memory: nächtlicher Lauf mit echtem Modell scheitert seit 5 Nächten am Modell-Download
