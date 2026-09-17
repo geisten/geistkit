@@ -38,7 +38,7 @@ verifizieren. Danach neue Programme daraus zusammensetzen.
 
 ## Stand (15.09.2026)
 
-**Letzter `make ci` (17.09., nach den ersten fünf Merges, Profil `linux-x86_64-avx512`):**
+**Letzter `make ci`** (17.09., nach den ersten fünf Merges, Profil `linux-x86_64-avx512`):**
 
 | Vorgabe | Wert | Fix |
 |---|---|---|
@@ -247,13 +247,13 @@ Gemessen am 17.09.: **9,5 von 10 GB belegt, 46 Einträge.** Jeder PR legt eine e
 | Fix | PR | Status |
 |---|---|---|
 | F2 | [geisten/geist-diktat#50](https://github.com/geisten/geist-diktat/pull/50) | **gemergt** (17.09.). quality-audit `contracts` bleibt rot, war aber schon auf main rot (→ F9) |
-| F1 | [geisten/geistlib#414](https://github.com/geisten/geistlib/pull/414) | offen. Nur Tests, CI und Doku. **Noch nicht mergen:** Der neue Job hat einen echten Defekt gefunden (siehe F1e), und der coverage ratchet braucht #413 |
-| F1e | [geisten/geistlib#417](https://github.com/geisten/geistlib/pull/417) | offen. ASan instrumentiert den Prolog der AVX-512-TU EVEX-codiert, also vor dem Guard in `kernel_q4kx8_gemm_avx512_full.c:815`; auf CPUs ohne AVX-512 gibt das SIGILL. Fix: Guard und Shape-Dispatch liegen in der TU ohne `-mavx512*`, das Panel bleibt als `q4kx8_gemm16x16_avx512_bulk()`. Nachweise: qemu ohne AVX-512 vorher Exit 132, jetzt 0 · EVEX in der Einsprungfunktion 2 → 0 · Tile-Kernel unverändert 1315 Befehle · Release-Suite 39/24/0 · Sweep ohne Regression. CI: TSan und AVX-512-Build grün, rot nur Vulkan (Infrastruktur) und coverage ratchet (Modell-Cache, siehe F10). **Reihenfolge:** vor #414 mergen |
-| F5a | [geisten/geistlib#416](https://github.com/geisten/geistlib/pull/416) | offen, wartet auf Review. `GEIST_AT_LEAST(n)`, alle 6 Header auch in C++17 nutzbar, `make check-headers` in Test und CI. Nachweis: C-Tokenstrom identisch, `libgeist.a` bit-gleich. Nebenbei das Release-Gate korrigiert, das den von §6 geforderten CHANGELOG-Eintrag verbot. 20 von 21 Jobs grün |
+| F1 | [geisten/geistlib#414](https://github.com/geisten/geistlib/pull/414) | **gemergt** (17.09.). Nur Tests, CI und Doku. Ursprünglich blockiert: Der neue Job hat einen echten Defekt gefunden (siehe F1e), und der coverage ratchet braucht #413 |
+| F1e | [geisten/geistlib#417](https://github.com/geisten/geistlib/pull/417) | **gemergt** (17.09.). ASan instrumentierte den Prolog der AVX-512-TU EVEX-codiert, also vor dem Guard in `kernel_q4kx8_gemm_avx512_full.c:815`; auf CPUs ohne AVX-512 gibt das SIGILL. Fix: Guard und Shape-Dispatch liegen in der TU ohne `-mavx512*`, das Panel bleibt als `q4kx8_gemm16x16_avx512_bulk()`. Nachweise: qemu ohne AVX-512 vorher Exit 132, jetzt 0 · EVEX in der Einsprungfunktion 2 → 0 · Tile-Kernel unverändert 1315 Befehle · Release-Suite 39/24/0 · Sweep ohne Regression. CI: TSan und AVX-512-Build grün, rot nur Vulkan (Infrastruktur) und coverage ratchet (Modell-Cache, siehe F10). **Reihenfolge:** vor #414 mergen |
+| F5a | [geisten/geistlib#416](https://github.com/geisten/geistlib/pull/416) | **gemergt** (17.09.). `GEIST_AT_LEAST(n)`, alle 6 Header auch in C++17 nutzbar, `make check-headers` in Test und CI. Nachweis: C-Tokenstrom identisch, `libgeist.a` bit-gleich. Nebenbei das Release-Gate korrigiert, das den von §6 geforderten CHANGELOG-Eintrag verbot. 20 von 21 Jobs grün |
 | F9 | [geisten/geist-diktat#51](https://github.com/geisten/geist-diktat/pull/51) | **gemergt** (17.09.). ibus-Lifecycle 12/12, quality-audit läuft jetzt auch bei Push auf main. Die 8 nvim-Prüfungen bleiben rot (Issues #19, #20, #24) |
 | F3 | [geisten/geistshell#148](https://github.com/geisten/geistshell/pull/148) | **gemergt** (17.09.): API v0.11.0, SHA-Pin, Gitlink weg, `scripts/sync-engine.sh`, Race behoben (vorher 3/3 fehlgeschlagen, jetzt 3/3 grün) |
 | F6a | [geisten/geistlib#413](https://github.com/geisten/geistlib/pull/413) | **gemergt** (17.09.): BitNet, Qwen3.5, Qwen3 und SmolLM2 per HF-Revision und SHA-256. Dazu `8668bbb`: coverage-Job lädt Gemma nach, statt sich auf den Cache zu verlassen (Cache 8,4 von 10 GB, pro PR 3 GB). Vulkan-GPU-Job rot durch Infrastruktur |
-| F8 | [geisten/geistlib#415](https://github.com/geisten/geistlib/pull/415) | offen, wartet auf Review. macOS-Intel-Job grün. Umfang größer als geplant, 6 Commits: `hw_probe.c`; mac-Targets auf x86_64 mit `cpu_x86`; CI-Leg `macos-15-intel`; clang-x86-Fixes in `audio_linear.c` (VNNI), `ptqtp_kernel.c`, `elementwise.c`. Nachweise nach §6: bitgleich, Opcode-Folgen gleich, Laufzeit im Rauschen |
+| F8 | [geisten/geistlib#415](https://github.com/geisten/geistlib/pull/415) | **gemergt** (17.09.). macOS-Intel-Job grün. Umfang größer als geplant, 6 Commits: `hw_probe.c`; mac-Targets auf x86_64 mit `cpu_x86`; CI-Leg `macos-15-intel`; clang-x86-Fixes in `audio_linear.c` (VNNI), `ptqtp_kernel.c`, `elementwise.c`. Nachweise nach §6: bitgleich, Opcode-Folgen gleich, Laufzeit im Rauschen |
 | C1–C5 | [geisten/geistkit#1](https://github.com/geisten/geistkit/pull/1) | **gemergt** (17.09.). 2. Lauf: macOS arm64 grün, übrige Legs rot nur durch F1, F2, F8 |
 
 **Gehostete x86-Runner:** Der CPU-Pool ist gemischt, mal mit, mal ohne AVX-512. Die Profil-Erkennung wählt pro Lauf `linux-x86_64` oder `linux-x86_64-avx512`, beide Profile werden gebraucht.
@@ -265,3 +265,9 @@ Gemessen am 17.09.: **9,5 von 10 GB belegt, 46 Einträge.** Jeder PR legt eine e
 ## Offene Fragen
 
 1. **Tag v0.11.1:** Setzt Claude ihn nach den Merges von F1 und F4 (nach Rückfrage), oder macht das der User?
+
+**Stand 17.09., alle neun PRs gemergt:** geistlib `main` = `559a1173` (enthält #413, #414, #415, #416, #417), geistshell `4e97b60b`, geist-diktat `98525d23`, geistkit `main`.
+
+- **Der Lock zeigt weiter auf v0.11.0.** Alle geistlib-Fixes stecken in `main`, nicht im Tag. Deshalb bleibt der ASan-Schritt bei uns rot, bis der Tag **v0.11.1** existiert und der Lock dorthin wandert. Laut Entscheidung erst, wenn auch F4 durch ist.
+- `ASAN_OPTIONS=detect_leaks=0` ist aus dem geistkit-Makefile entfernt, weil F1c das Leck behoben hat. Wirksam wird das mit dem Lock-Bump.
+- **Fremder offener PR:** geist-diktat#41 „test: Plattform-Audit, deutsche WER und Produktfahrplan“ (Branch `codex/quality-audit-20260905`, vom 05.09.). Nicht von uns, nicht angefasst.
