@@ -1,0 +1,117 @@
+# geistkit CI: the same `make` targets on every platform, results as artifact and job summary.
+# Self-hosted runners never run pull requests. A PR can change this file, so external
+# contributors additionally need approval (repo setting: all_external_contributors).
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: '17 2 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  linux:
+    name: linux ${{ matrix.runner }} (container, offline)
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - run: make ci JOBS=4
+      - if: always()
+        run: cat build/verify.txt >>"$GITHUB_STEP_SUMMARY" 2>/dev/null || echo "no verify.txt" >>"$GITHUB_STEP_SUMMARY"
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: verify-${{ matrix.runner }}
+          path: |
+            build/verify.txt
+            build/results.tsv
+            build/toolchain.txt
+            build/logs/
+
+  amd-desktop:
+    name: linux x86_64 (amd-desktop, container, offline)
+    if: github.event_name != 'pull_request'
+    runs-on: [self-hosted, Linux, X64, amd-desktop]
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - run: make ci JOBS=8
+      - if: always()
+        run: cat build/verify.txt >>"$GITHUB_STEP_SUMMARY" 2>/dev/null || echo "no verify.txt" >>"$GITHUB_STEP_SUMMARY"
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: verify-amd-desktop
+          path: |
+            build/verify.txt
+            build/results.tsv
+            build/toolchain.txt
+            build/logs/
+
+  # Enabled by the repository variable PI5_RUNNER=on once a geistkit runner is registered on the Pi.
+  pi5:
+    name: linux arm64 (Raspberry Pi 5, container, offline)
+    if: github.event_name != 'pull_request' && vars.PI5_RUNNER == 'on'
+    runs-on: [self-hosted, Linux, ARM64, pi5]
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+      - run: make ci JOBS=4
+      - if: always()
+        run: cat build/verify.txt >>"$GITHUB_STEP_SUMMARY" 2>/dev/null || echo "no verify.txt" >>"$GITHUB_STEP_SUMMARY"
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: verify-pi5
+          path: |
+            build/verify.txt
+            build/results.tsv
+            build/toolchain.txt
+            build/logs/
+
+  # No Docker on hosted macOS: native, toolchain from the matrix.
+  macos:
+    name: macos ${{ matrix.runner }} (${{ matrix.cc }})
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [macos-15, macos-15-intel]
+        cc: [apple-clang, llvm@19]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - name: Toolchain
+        run: |
+          brew install libomp numpy ${{ matrix.cc == 'llvm@19' && 'llvm@19' || '' }}
+          echo "LIBOMP_PREFIX=$(brew --prefix libomp)" >>"$GITHUB_ENV"
+          if [ '${{ matrix.cc }}' = llvm@19 ]; then
+            echo "CC=$(brew --prefix llvm@19)/bin/clang" >>"$GITHUB_ENV"
+            echo "ANALYZE_CC=$(brew --prefix llvm@19)/bin/clang" >>"$GITHUB_ENV"
+          else
+            echo "CC=clang" >>"$GITHUB_ENV"
+            echo "ANALYZE_CC=clang" >>"$GITHUB_ENV"
+          fi
+      - run: make fetch
+      - run: make verify JOBS=3
+      - if: always()
+        run: cat build/verify.txt >>"$GITHUB_STEP_SUMMARY" 2>/dev/null || echo "no verify.txt" >>"$GITHUB_STEP_SUMMARY"
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: verify-${{ matrix.runner }}-${{ matrix.cc }}
+          path: |
+            build/verify.txt
+            build/results.tsv
+            build/toolchain.txt
+            build/logs/

@@ -146,12 +146,54 @@ Alle Header haben bereits `extern "C"`-Guards. Die Ursache ist allein die C-Synt
 - [ ] **F6c (geistkit)** Modelle mit URL und SHA-256 in `versions.mk`, `make fetch-models`, Cache in Actions über den SHA als Schlüssel
 - [ ] **F6d (geistkit)** Profil „model“ (nächtlich): Zähler je Modell in `acceptance.tsv`, als Ratsche
 
+### F8 – geistlib auf macOS Intel (Repo geistlib), gefunden durch geistkit#1
+
+- [ ] `src/base/hw_probe.c:58`: `sysctl_bool` ist unter `__APPLE__` definiert, wird aber nur im aarch64-Zweig benutzt (Z. 135/136). Auf `macos-15-intel` bricht der Build mit Apple clang 17 und mit llvm@19 an `-Werror,-Wunused-function` ab.
+  - **Fix:** Die Definition genauso bedingen wie die Nutzung.
+- [ ] macOS-Intel-Job in der geistlib-CI. Heute fehlt er. geist-memory baut die Engine ohne `-Werror`, deshalb fiel der Fehler dort nicht auf.
+- **geistkit danach:** In `acceptance.d/darwin-x86_64.tsv` die gemessenen Zähler eintragen.
+
+### F9 – geist-diktat: quality-audit `contracts` auf main rot (Repo geist-diktat), gefunden bei der Prüfung von #50
+
+Nachgestellt mit `tests/ubuntu.Dockerfile`, ohne Netz. Die Fehler sind auf `origin/main` und im PR-Branch identisch. Der Workflow läuft nur bei PRs auf bestimmte Pfade, deshalb gab es auf main nie einen roten Lauf. Befund: [#50, Kommentar](https://github.com/geisten/geist-diktat/pull/50#issuecomment-5686026515).
+
+Genauer Stand: **10 Fehler**, nicht 4. `nvim_contract.lua` scheitert in 8 von 13 Prüfungen, `ibus_lifecycle` in 2 von 12.
+
+- [x] ibus (2 Fehler) und Push-Trigger für quality-audit: [geist-diktat#51](https://github.com/geisten/geist-diktat/pull/51). Child-Watch sammelt den Gruppenleiter ein und setzt `e->pid` zurück, `pipeline_stop` ist idempotent. Nachweis: 12/12, dazu 100 Start/Stop- und 100 EOF-Zyklen ohne übrige Kindprozesse.
+- [ ] nvim (8 Fehler): Produktarbeit, bereits als Issues erfasst. #19 Zeilenpuffer für fragmentierte stdout-Zeilen und getrenntes UTF-8 (`lua/geist-diktat/init.lua:62`), #20 Sitzungsgeneration statt einem `job`-Handle, #24 Commandline-Queue und verschluckte Fehler.
+- [ ] Nirgends erfasst: „binary path shell-quoted“. `init.lua:34` maskiert `model`, aber nicht `binary`. Issue anlegen?
+- **Folge:** `contracts` bleibt rot, bis #19, #20 und #24 behoben sind. Durch den neuen Push-Trigger ist das auf main sichtbar.
+- **geistkit:** Später `make test-ubuntu` als eigenen Container-Schritt aufnehmen (GTK/Qt/IBus unter Xvfb). Heute nicht Teil der Pipeline.
+
+### Plattform-Befunde aus geistkit#1 (15.09.)
+
+| Profil | Runner | geistlib unit | geistshell | Rot durch |
+|---|---|---|---|---|
+| `linux-x86_64-avx512` | amd-desktop (lokal) | 40 / 24 / 0 | 61 / 1 / 0 | F1 (ASan), F2 (Audit) |
+| `linux-x86_64` | ubuntu-24.04 | 39 / 25 / 0 (ohne AVX-512) | 61 / 1 / 0 | F1, F2 |
+| `linux-aarch64` | ubuntu-24.04-arm | 31 / 23 / 0, ASan 31 / 23 / 0 | 61 / 1 / 0 | F2 |
+| `darwin-arm64` | macos-15, beide Compiler | 31 / 23 / 0, ASan 31 / 23 / 0 | 60 / 2 / Host-Skip 1 (von geistshell erlaubt) | – nach geistkit-Fix |
+| `darwin-x86_64` | macos-15-intel, beide Compiler | baut nicht | Folgefehler | F8 |
+
+- **geistkit-Fix (kein Upstream-Defekt):** Die ASan-Targets `test-model-alloc` und `test-tokenizer-oom` von geist-memory brauchen GNU ld `--wrap`. geistkit lässt sie auf Darwin weg, wie die macOS-CI von geist-memory selbst.
+- **Infrastruktur:** Der Job „Vulkan backend (discrete GPU)“ in geistlib ist in allen PRs rot. Auf amd-desktop passen NVIDIA-Kernel-Modul (595.84) und Userspace (595.91) nicht zusammen. **Neustart des Rechners nötig.**
+
+### F10 – geistlib: Cache-Politik für Modelle (Repo geistlib)
+
+Gemessen am 17.09.: **9,5 von 10 GB belegt, 46 Einträge.** Jeder PR legt eine eigene Kopie an: Gemma 2,8 GB je PR (#416, #417), Qwen3 0,57 GB je PR (#415, #416, #417), SmolLM2 0,34 GB je PR. Für `main` gibt es **keine** Gemma-Kopie mehr. Folge: Jobs werden ohne Codefehler rot, siehe #413, #414, #417.
+
+- [ ] Modell-Caches nur auf `main` schreiben, PRs nur lesen (`actions/cache/restore` mit `lookup-only`/`restore-keys`, `actions/cache/save` nur bei Push auf main)
+- [ ] Alternativ oder zusätzlich: Modelle nicht cachen, sondern über den SHA-256-Pin aus F6a frisch laden (Gemma 3,1 GB in etwa 30 s gemessen)
+- [ ] Sofortmaßnahme durch den User: alte PR-Caches löschen, `gh cache list -R geisten/geistlib`, dann `gh cache delete <key>`
+- **Zusammenhang:** #413 behebt nur die Folge (Fetch-Schritt), nicht die Ursache.
+
 ### F7 – Upstream-Hygiene
 
 - [ ] geist-memory: nächtlicher Lauf mit echtem Modell scheitert seit 5 Nächten am Modell-Download
 - [ ] geist-diktat: Engine-Sync nicht beim Parsen des Makefiles, Skip bei fehlendem Modell nicht als exit 0
 - [ ] geistshell: Pi-5-Workflow wurde 30-mal nach 24 h abgebrochen (kein Runner hat die Jobs angenommen)
 - [ ] homebrew-tap von 0.6.0 auf v0.11.0
+- [ ] geistlib: `bench_q4k_kernel` steht in `CBLAS_REF_TESTS` und `NEON_KERNEL_TESTS` und ist deshalb auf x86 nicht baubar, obwohl der Kernel dort läuft. Gefunden bei F1e, das musste auf `bench_perf_sweep` ausweichen.
 
 ---
 
@@ -207,10 +249,19 @@ Alle Header haben bereits `extern "C"`-Guards. Die Ursache ist allein die C-Synt
 
 | Fix | PR | Status |
 |---|---|---|
-| F2 | [geisten/geist-diktat#50](https://github.com/geisten/geist-diktat/pull/50) | offen, wartet auf Review |
-| F1 | geistlib (ASan x86) | in Arbeit |
-| F3 | geistshell (Engine v0.11.0, Pin, Race) | in Arbeit |
-| F6a | geistlib (Modell-Revisionen und SHA-256) | in Arbeit |
+| F2 | [geisten/geist-diktat#50](https://github.com/geisten/geist-diktat/pull/50) | offen, wartet auf Review. quality-audit `contracts` bleibt rot, war aber schon auf main rot (→ F9) |
+| F1 | [geisten/geistlib#414](https://github.com/geisten/geistlib/pull/414) | offen. Nur Tests, CI und Doku. **Noch nicht mergen:** Der neue Job hat einen echten Defekt gefunden (siehe F1e), und der coverage ratchet braucht #413 |
+| F1e | [geisten/geistlib#417](https://github.com/geisten/geistlib/pull/417) | offen. ASan instrumentiert den Prolog der AVX-512-TU EVEX-codiert, also vor dem Guard in `kernel_q4kx8_gemm_avx512_full.c:815`; auf CPUs ohne AVX-512 gibt das SIGILL. Fix: Guard und Shape-Dispatch liegen in der TU ohne `-mavx512*`, das Panel bleibt als `q4kx8_gemm16x16_avx512_bulk()`. Nachweise: qemu ohne AVX-512 vorher Exit 132, jetzt 0 · EVEX in der Einsprungfunktion 2 → 0 · Tile-Kernel unverändert 1315 Befehle · Release-Suite 39/24/0 · Sweep ohne Regression. CI: TSan und AVX-512-Build grün, rot nur Vulkan (Infrastruktur) und coverage ratchet (Modell-Cache, siehe F10). **Reihenfolge:** vor #414 mergen |
+| F5a | [geisten/geistlib#416](https://github.com/geisten/geistlib/pull/416) | offen, wartet auf Review. `GEIST_AT_LEAST(n)`, alle 6 Header auch in C++17 nutzbar, `make check-headers` in Test und CI. Nachweis: C-Tokenstrom identisch, `libgeist.a` bit-gleich. Nebenbei das Release-Gate korrigiert, das den von §6 geforderten CHANGELOG-Eintrag verbot. 20 von 21 Jobs grün |
+| F9 | [geisten/geist-diktat#51](https://github.com/geisten/geist-diktat/pull/51) | offen, wartet auf Review. ibus-Lifecycle 12/12, quality-audit läuft jetzt auch bei Push auf main. Die 8 nvim-Prüfungen bleiben rot (Issues #19, #20, #24) |
+| F3 | [geisten/geistshell#148](https://github.com/geisten/geistshell/pull/148) | offen, wartet auf Review: API v0.11.0, SHA-Pin, Gitlink weg, `scripts/sync-engine.sh`, Race behoben (vorher 3/3 fehlgeschlagen, jetzt 3/3 grün) |
+| F6a | [geisten/geistlib#413](https://github.com/geisten/geistlib/pull/413) | offen, wartet auf Review: BitNet, Qwen3.5, Qwen3 und SmolLM2 per HF-Revision und SHA-256. Dazu `8668bbb`: coverage-Job lädt Gemma nach, statt sich auf den Cache zu verlassen (Cache 8,4 von 10 GB, pro PR 3 GB). Vulkan-GPU-Job rot durch Infrastruktur |
+| F8 | [geisten/geistlib#415](https://github.com/geisten/geistlib/pull/415) | offen, wartet auf Review. macOS-Intel-Job grün. Umfang größer als geplant, 6 Commits: `hw_probe.c`; mac-Targets auf x86_64 mit `cpu_x86`; CI-Leg `macos-15-intel`; clang-x86-Fixes in `audio_linear.c` (VNNI), `ptqtp_kernel.c`, `elementwise.c`. Nachweise nach §6: bitgleich, Opcode-Folgen gleich, Laufzeit im Rauschen |
+| C1–C5 | [geisten/geistkit#1](https://github.com/geisten/geistkit/pull/1) | offen. 2. Lauf: macOS arm64 grün, übrige Legs rot nur durch F1, F2, F8 |
+
+**Gehostete x86-Runner:** Der CPU-Pool ist gemischt, mal mit, mal ohne AVX-512. Die Profil-Erkennung wählt pro Lauf `linux-x86_64` oder `linux-x86_64-avx512`, beide Profile werden gebraucht.
+
+**Runner:** `geisten_amd_nvidea-gk` ist für geistkit registriert (`~/actions-runner-geistkit`). Der Dienst muss noch mit sudo installiert werden. Pi 5: ab 18.09. eine eigene geistkit-Runner-Instanz registrieren, dann die Repo-Variable `PI5_RUNNER=on` setzen.
 
 **Nach jedem Merge:** SHA in `versions.mk` nachziehen und die Vorgaben in `acceptance.tsv` verschärfen.
 
