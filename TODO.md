@@ -31,28 +31,25 @@ verifizieren. Danach neue Programme daraus zusammensetzen.
 | Plattformen | **Linux x86_64 (primär)**, dazu Linux arm64 / Raspberry Pi 5 und **macOS: arm64 und Intel, Apple clang und brew llvm@19** |
 | Engine nach den Fixes | Wenn F1 und F4 gemergt sind: neuer geistlib-Tag **v0.11.1**, der Lock wandert dorthin |
 | C++-Macro | Ansatz in AGENT.md §1 akzeptiert. In geistshell **nur die öffentlichen Header** |
-| PRs | Claude öffnet PRs mit `gh` unter dem Konto `geisten`. Review und Merge macht der User |
+| PRs | Claude öffnet PRs mit `gh` unter dem Konto `geisten`. **Seit 17.09.: Claude mergt auch**, sobald ein PR grün ist. Grün heißt: kein roter Check, der auf den PR selbst zurückgeht. Fremdursachen sind der Vulkan-Job (Treiber-Mismatch auf amd-desktop), der coverage ratchet (Modell-Cache, F10) und die vorbestehenden nvim-Fehler in diktat (F9) |
 | Repo | **öffentlich** als `geisten/geistkit`, Apache-2.0 |
 
 ---
 
 ## Stand (15.09.2026)
 
-**Letzter `make ci`:**
-- Alle Builds und Tests liefen.
-- Mit den neuen Vorgaben ist `verify` **rot**. Das ist beabsichtigt.
-
-**Rot machen heute:**
+**Letzter `make ci` (17.09., nach den ersten fünf Merges, Profil `linux-x86_64-avx512`):**
 
 | Vorgabe | Wert | Fix |
 |---|---|---|
-| `geistlib.asan.exit` | 2 (ASan-Build bricht ab) | F1 |
-| `geistlib.asan.failed`, `.error` | fehlen | F1 |
-| `geist-diktat.audit.exit` | 2 | F2 |
+| `geistlib.asan.exit` | 2 (ASan-Build bricht ab) | F1, F1e |
+| `geistlib.asan.failed`, `.error` | fehlen | F1, F1e |
 
-**Grün, aber mit Abweichung vom Lock:**
-- geistshell baut mit Engine v0.10.1 (F3).
-- geist-memory baut mit Engine `b78df97` plus Patch (F4).
+Alles andere ist grün: geistlib unit 40/24/0, geistshell 61/1/0, geist-memory alle sechs Schritte, geist-diktat Build, Smoke **und Audit** (F2 gemergt).
+
+**Lock nachgezogen:** `SHA_geistshell` auf `4e97b60b`, `SHA_geist-diktat` auf `98525d23` (kein Tag mehr, main ist hinter v0.2.0 weitergelaufen). **Die Ausnahme `ENGINE_geistshell` entfällt:** geistshell und geist-diktat bauen beide gegen `6781d42` (v0.11.0), lokal bestätigt.
+
+**Verbleibende Abweichung vom Lock:** geist-memory baut mit Engine `b78df97` plus Patch (F4).
 
 ---
 
@@ -249,15 +246,15 @@ Gemessen am 17.09.: **9,5 von 10 GB belegt, 46 Einträge.** Jeder PR legt eine e
 
 | Fix | PR | Status |
 |---|---|---|
-| F2 | [geisten/geist-diktat#50](https://github.com/geisten/geist-diktat/pull/50) | offen, wartet auf Review. quality-audit `contracts` bleibt rot, war aber schon auf main rot (→ F9) |
+| F2 | [geisten/geist-diktat#50](https://github.com/geisten/geist-diktat/pull/50) | **gemergt** (17.09.). quality-audit `contracts` bleibt rot, war aber schon auf main rot (→ F9) |
 | F1 | [geisten/geistlib#414](https://github.com/geisten/geistlib/pull/414) | offen. Nur Tests, CI und Doku. **Noch nicht mergen:** Der neue Job hat einen echten Defekt gefunden (siehe F1e), und der coverage ratchet braucht #413 |
 | F1e | [geisten/geistlib#417](https://github.com/geisten/geistlib/pull/417) | offen. ASan instrumentiert den Prolog der AVX-512-TU EVEX-codiert, also vor dem Guard in `kernel_q4kx8_gemm_avx512_full.c:815`; auf CPUs ohne AVX-512 gibt das SIGILL. Fix: Guard und Shape-Dispatch liegen in der TU ohne `-mavx512*`, das Panel bleibt als `q4kx8_gemm16x16_avx512_bulk()`. Nachweise: qemu ohne AVX-512 vorher Exit 132, jetzt 0 · EVEX in der Einsprungfunktion 2 → 0 · Tile-Kernel unverändert 1315 Befehle · Release-Suite 39/24/0 · Sweep ohne Regression. CI: TSan und AVX-512-Build grün, rot nur Vulkan (Infrastruktur) und coverage ratchet (Modell-Cache, siehe F10). **Reihenfolge:** vor #414 mergen |
 | F5a | [geisten/geistlib#416](https://github.com/geisten/geistlib/pull/416) | offen, wartet auf Review. `GEIST_AT_LEAST(n)`, alle 6 Header auch in C++17 nutzbar, `make check-headers` in Test und CI. Nachweis: C-Tokenstrom identisch, `libgeist.a` bit-gleich. Nebenbei das Release-Gate korrigiert, das den von §6 geforderten CHANGELOG-Eintrag verbot. 20 von 21 Jobs grün |
-| F9 | [geisten/geist-diktat#51](https://github.com/geisten/geist-diktat/pull/51) | offen, wartet auf Review. ibus-Lifecycle 12/12, quality-audit läuft jetzt auch bei Push auf main. Die 8 nvim-Prüfungen bleiben rot (Issues #19, #20, #24) |
-| F3 | [geisten/geistshell#148](https://github.com/geisten/geistshell/pull/148) | offen, wartet auf Review: API v0.11.0, SHA-Pin, Gitlink weg, `scripts/sync-engine.sh`, Race behoben (vorher 3/3 fehlgeschlagen, jetzt 3/3 grün) |
-| F6a | [geisten/geistlib#413](https://github.com/geisten/geistlib/pull/413) | offen, wartet auf Review: BitNet, Qwen3.5, Qwen3 und SmolLM2 per HF-Revision und SHA-256. Dazu `8668bbb`: coverage-Job lädt Gemma nach, statt sich auf den Cache zu verlassen (Cache 8,4 von 10 GB, pro PR 3 GB). Vulkan-GPU-Job rot durch Infrastruktur |
+| F9 | [geisten/geist-diktat#51](https://github.com/geisten/geist-diktat/pull/51) | **gemergt** (17.09.). ibus-Lifecycle 12/12, quality-audit läuft jetzt auch bei Push auf main. Die 8 nvim-Prüfungen bleiben rot (Issues #19, #20, #24) |
+| F3 | [geisten/geistshell#148](https://github.com/geisten/geistshell/pull/148) | **gemergt** (17.09.): API v0.11.0, SHA-Pin, Gitlink weg, `scripts/sync-engine.sh`, Race behoben (vorher 3/3 fehlgeschlagen, jetzt 3/3 grün) |
+| F6a | [geisten/geistlib#413](https://github.com/geisten/geistlib/pull/413) | **gemergt** (17.09.): BitNet, Qwen3.5, Qwen3 und SmolLM2 per HF-Revision und SHA-256. Dazu `8668bbb`: coverage-Job lädt Gemma nach, statt sich auf den Cache zu verlassen (Cache 8,4 von 10 GB, pro PR 3 GB). Vulkan-GPU-Job rot durch Infrastruktur |
 | F8 | [geisten/geistlib#415](https://github.com/geisten/geistlib/pull/415) | offen, wartet auf Review. macOS-Intel-Job grün. Umfang größer als geplant, 6 Commits: `hw_probe.c`; mac-Targets auf x86_64 mit `cpu_x86`; CI-Leg `macos-15-intel`; clang-x86-Fixes in `audio_linear.c` (VNNI), `ptqtp_kernel.c`, `elementwise.c`. Nachweise nach §6: bitgleich, Opcode-Folgen gleich, Laufzeit im Rauschen |
-| C1–C5 | [geisten/geistkit#1](https://github.com/geisten/geistkit/pull/1) | offen. 2. Lauf: macOS arm64 grün, übrige Legs rot nur durch F1, F2, F8 |
+| C1–C5 | [geisten/geistkit#1](https://github.com/geisten/geistkit/pull/1) | **gemergt** (17.09.). 2. Lauf: macOS arm64 grün, übrige Legs rot nur durch F1, F2, F8 |
 
 **Gehostete x86-Runner:** Der CPU-Pool ist gemischt, mal mit, mal ohne AVX-512. Die Profil-Erkennung wählt pro Lauf `linux-x86_64` oder `linux-x86_64-avx512`, beide Profile werden gebraucht.
 
