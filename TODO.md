@@ -193,6 +193,7 @@ Gemessen am 17.09.: **9,5 von 10 GB belegt, 46 Einträge.** Jeder PR legt eine e
 - [ ] geist-diktat: Engine-Sync nicht beim Parsen des Makefiles, Skip bei fehlendem Modell nicht als exit 0
 - [ ] geistshell: Pi-5-Workflow wurde 30-mal nach 24 h abgebrochen (kein Runner hat die Jobs angenommen)
 - [ ] homebrew-tap von 0.6.0 auf v0.11.0
+- [ ] geistlib: `bench_q4k_kernel` steht in `CBLAS_REF_TESTS` und `NEON_KERNEL_TESTS` und ist deshalb auf x86 nicht baubar, obwohl der Kernel dort läuft. Gefunden bei F1e, das musste auf `bench_perf_sweep` ausweichen.
 
 ---
 
