@@ -296,3 +296,36 @@ ASan-Zähler sind jetzt in `acceptance.d/linux-x86_64-avx512.tsv` (≥ 40 / ≤ 
 **Zwei neue Befunde für die Liste:**
 - Unser Toolchain-Image enthält **kein `clang-format`**. Die geistlib-CI pinnt Version 22.1.5 per pip, das Gate ist bei uns also nicht abgedeckt. Für geistkit nachrüsten oder bewusst offenlassen.
 - Tags in geistlib sind Release-Ereignisse, kein `git tag`. Das gehört in die Entscheidungstabelle, falls später doch v0.11.1 gefahren wird: erst Versionsbump in `include/geist.h` plus CHANGELOG, dann `release.yml`.
+
+---
+
+## 19.09.: Gate erstmals vollständig grün
+
+`make ci` → **Exit 0** in 315 s, Profil `linux-x86_64-avx512`, alle 11 Vorgaben erfüllt.
+
+| Projekt | Lock | Engine | Ergebnis |
+|---|---|---|---|
+| geistlib | `18a52c30` (main, v0.11.0-64) | – | unit 40/24/0 · **ASan/UBSan mit Leak-Erkennung 40/24/0** · py · contract |
+| geistshell | `5c8a9761` | `18a52c3` | 61/1/0, Journal-Baseline grün |
+| geist-memory | `b29243de` | `18a52c3` | alle 6 Schritte, **ohne Engine-Patch** |
+| geist-diktat | `98525d23` | `18a52c3` | Build, Smoke, Audit |
+
+**Damit ist P1 erreicht:** eine Engine für alle, kein Patch, keine Ausnahme in `ENGINE_*`. geistshell und geist-memory pinnen diese Revision inzwischen selbst.
+
+**15 PRs gemergt:** geistlib #413–#420, geistshell #148 und #149, geist-diktat #50 und #51, geist-memory #5, geistkit #1.
+
+### Neue Befunde, noch offen
+
+- [ ] **`test_cli_device` in geistshell ist flakey unter Last.** Im `make ci`-Lauf mit parallelen Fork-Containern: 58/1/0, Fehlschlag „the plant readings never reached the journaled context“. Gegenprobe mit frischem Baum: **6 von 6 Läufen 61/1/0**, dreimal gegen Engine `main`, dreimal gegen v0.11.0 — also nicht engine-abhängig. Der Test wartet auf Messwerte eines Device-Kanals; unter Last reicht die Wartezeit nicht. Upstream mit Zeitbudget oder Warteschleife statt fester Frist.
+- [ ] **geist-memory: `-j`-Races bleiben.** `deps` (check-engine vor dem Stempel) und `check-repro.sh` (erbt `MAKEFLAGS`). geistkit läuft deshalb für beide ohne `-j`. Eigener PR.
+- [ ] **geistshell-Makefile:** Der Kommentarblock zu `GEIST_TARGET` (Z. 25–40) steht doppelt, praktisch wortgleich.
+- [ ] **`clang-format` fehlt im Toolchain-Image.** Die geistlib-CI pinnt 22.1.5 per pip. Solange geistkit keinen Format-Schritt aufruft, wäre Nachrüsten allein wirkungslos — beides zusammen oder bewusst offenlassen.
+- [ ] **geist-diktat#41** („Plattform-Audit, deutsche WER und Produktfahrplan“, 05.09.) ist fremd und unangetastet.
+- [ ] **Ohne Issue:** `lua/geist-diktat/init.lua:34` maskiert `model`, aber nicht `binary`.
+
+### Als Nächstes
+
+- [ ] **P2:** Testmodelle in den Lock (Qwen3.5-0.8B und BitNet, beide mit SHA-256 in geistlib gepinnt), Profil „model“ nächtlich, Skip-Zahlen senken
+- [ ] **P3:** Produktkriterien messbar machen (diktat WER, p95, RTF)
+- [ ] **P4:** Fuzzing, geistshell-Isolation (bwrap/Landlock), reservierte Memory-Namen, `realpath` im Workdir
+- [ ] **Freitag:** `AMD_DESKTOP_RUNNER=on`, Pi-Runner registrieren und `PI5_RUNNER=on`, Rechner neu starten wegen der NVIDIA-Treiber
