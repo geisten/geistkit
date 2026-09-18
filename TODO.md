@@ -266,8 +266,33 @@ Gemessen am 17.09.: **9,5 von 10 GB belegt, 46 Einträge.** Jeder PR legt eine e
 
 1. **Tag v0.11.1:** Setzt Claude ihn nach den Merges von F1 und F4 (nach Rückfrage), oder macht das der User?
 
-**Stand 17.09., alle neun PRs gemergt:** geistlib `main` = `559a1173` (enthält #413, #414, #415, #416, #417), geistshell `4e97b60b`, geist-diktat `98525d23`, geistkit `main`.
+**Stand 17.09. (überholt, siehe unten), alle neun PRs gemergt:** geistlib `main` = `559a1173` (enthält #413, #414, #415, #416, #417), geistshell `4e97b60b`, geist-diktat `98525d23`, geistkit `main`.
 
 - **Der Lock zeigt weiter auf v0.11.0.** Alle geistlib-Fixes stecken in `main`, nicht im Tag. Deshalb bleibt der ASan-Schritt bei uns rot, bis der Tag **v0.11.1** existiert und der Lock dorthin wandert. Laut Entscheidung erst, wenn auch F4 durch ist.
 - `ASAN_OPTIONS=detect_leaks=0` ist aus dem geistkit-Makefile entfernt, weil F1c das Leck behoben hat. Wirksam wird das mit dem Lock-Bump.
 - **Fremder offener PR:** geist-diktat#41 „test: Plattform-Audit, deutsche WER und Produktfahrplan“ (Branch `codex/quality-audit-20260905`, vom 05.09.). Nicht von uns, nicht angefasst.
+
+---
+
+## Stand 18.09.: alle zwölf PRs gemergt, Lock auf geistlib `main`
+
+`SHA_geistlib := 18a52c30` (v0.11.0-64), `TAG_geistlib := -`. **Kein Release 0.11.1**, Entscheidung des Users: In geistlib entstehen Tags ausschließlich über `release.yml` (`workflow_dispatch`), der die Version gegen `include/geist.h` prüft, die SDK-Artefakte baut und Tag **und** Release veröffentlicht. Ein handgesetztes Tag würde diese Konvention brechen. Der Tag v0.11.0 trägt außerdem `tools/fetch-dep.sh` nicht im Baum — in `main` ist sie vorhanden.
+
+**Gemessen mit dem neuen Lock (`make ci`, Profil `linux-x86_64-avx512`, 179 s):**
+
+| Schritt | Ergebnis |
+|---|---|
+| geistlib unit | 40 bestanden / 24 übersprungen / 0 fehlgeschlagen |
+| geistlib **ASan/UBSan mit Leak-Erkennung** | 40 / 24 / 0, Exit 0 — F1, F1c und F1e wirken, `detect_leaks=0` ist entfernt |
+| geistlib py, contract | grün |
+| geistshell | 61 / 1 / 0, Journal-Baseline grün, Engine = Referenz |
+| geist-diktat | Build, Smoke und Audit grün, Engine = Referenz |
+| geist-memory | **rot**, siehe unten |
+
+ASan-Zähler sind jetzt in `acceptance.d/linux-x86_64-avx512.tsv` (≥ 40 / ≤ 24) und `acceptance.d/linux-x86_64.tsv` (≥ 39 / ≤ 25) verankert.
+
+**geist-memory ist rot, und zwar richtig so:** `make deps` scheitert, weil `patches/geistlib-compat.patch` auf `18a52c30` nicht mehr anwendbar ist — genau an `src/base/hw_probe.c`, `src/engine/model.c` und `src/engine/gguf_tokenizer.c`, deren Fixes inzwischen upstream sind (#415, #418, #419, #420). Die drei Folgefehler (asan, install, repro) hängen an der fehlenden Stempeldatei. Behoben wird das durch den PR `build/drop-engine-patch` in geist-memory (F4b, in Arbeit), danach `SHA_geist-memory` nachziehen.
+
+**Zwei neue Befunde für die Liste:**
+- Unser Toolchain-Image enthält **kein `clang-format`**. Die geistlib-CI pinnt Version 22.1.5 per pip, das Gate ist bei uns also nicht abgedeckt. Für geistkit nachrüsten oder bewusst offenlassen.
+- Tags in geistlib sind Release-Ereignisse, kein `git tag`. Das gehört in die Entscheidungstabelle, falls später doch v0.11.1 gefahren wird: erst Versionsbump in `include/geist.h` plus CHANGELOG, dann `release.yml`.

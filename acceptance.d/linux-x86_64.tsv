@@ -1,6 +1,8 @@
-# Linux x86_64 without AVX-512: GitHub-hosted ubuntu-24.04. Counts are a ratchet.
+# Linux x86_64 without AVX-512: GitHub-hosted ubuntu-24.04 (the hosted pool is mixed). Counts are a ratchet.
 geistlib.unit.passed             >=  39
 geistlib.unit.skipped            <=  25   # + test_q4kx8_gemm_unit (needs AVX-512 F/BW/DQ/VL); models/dumps -> F6b
+geistlib.asan.passed             >=  39   # ASan/UBSan with leak detection, since geistlib#414 and #417
+geistlib.asan.skipped            <=  25
 geistshell.test.passed           >=  61
 geistshell.test.skipped          <=  1    # test_cli_gym: no build/gymenv
 geistshell.test.host_skipped     ==  0

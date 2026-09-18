@@ -2,9 +2,13 @@
 # The SHA is what gets built. The TAG is checked against it after fetch:
 # a moved tag stops the build. TAG = - : upstream has no tag, or main moved past the last one.
 
+# geistlib main (v0.11.0-64), not the v0.11.0 tag: the ASan, macOS-Intel, C++-header,
+# AVX-512-dispatch and geist-memory fixes all landed after it, and the tag's tree even
+# lacks tools/fetch-dep.sh. Tags here are cut by the release workflow, not by `git tag`,
+# so a 0.11.1 release is a separate, deliberate step.
 REPO_geistlib       := https://github.com/geisten/geistlib.git
-TAG_geistlib        := v0.11.0
-SHA_geistlib        := 6781d425e4d9ac9ec4bf5fa7da9fa383be7e5d58
+TAG_geistlib        := -
+SHA_geistlib        := 18a52c303421a4dd145002ac13c479bb77a8a900
 
 REPO_geistshell     := https://github.com/geisten/geistshell.git
 TAG_geistshell      := -
@@ -19,12 +23,9 @@ TAG_geist-diktat    := -
 SHA_geist-diktat    := 98525d23375c2df6084542112ab3f8107b1ca59a
 
 # Engine revision each consumer is built against (cloned offline from
-# build/deps/geistlib). Goal: all equal to SHA_geistlib. Any deviation is debt
-# and belongs in TODO.md.
+# build/deps/geistlib). Goal reached: every consumer uses SHA_geistlib.
+# geist-memory still applies its own engine patch until its
+# build/drop-engine-patch PR is merged; the patch now applies on top of this revision.
 ENGINE_geistshell   := $(SHA_geistlib)
-
-# geist-memory: its own pin (v0.11.0-22). v0.11.0 builds and tests green, but check-deps
-# needs tools/fetch-dep.sh in the engine, which only lands after v0.11.0.
-ENGINE_geist-memory := b78df97fdb09b937f07082533e970b2d7a16ce83
-
+ENGINE_geist-memory := $(SHA_geistlib)
 ENGINE_geist-diktat := $(SHA_geistlib)
