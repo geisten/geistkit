@@ -81,7 +81,8 @@ jobs:
     timeout-minutes: 180
     steps:
       - uses: actions/checkout@v4
-      - run: make ci JOBS=4
+      # MEMORY: the default 24g exceeds every Pi 5 model; raise it via the PI5_MEMORY variable if the board has more.
+      - run: make ci JOBS=4 MEMORY=${{ vars.PI5_MEMORY || '6g' }}
       - if: always()
         run: cat build/verify.txt >>"$GITHUB_STEP_SUMMARY" 2>/dev/null || echo "no verify.txt" >>"$GITHUB_STEP_SUMMARY"
       - if: always()

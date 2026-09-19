@@ -15,6 +15,8 @@ DEPS     := $(CURDIR)/build/deps
 ENGINE   := $(DEPS)/geistlib
 # ponytail: fixed at 8. -j32 with ASan builds exhausted memory; raise it once the peak is measured.
 JOBS     ?= 8
+# Container memory cap. Fits this desktop; a Raspberry Pi 5 has 4-16 GB, so the pi5 job lowers it.
+MEMORY   ?= 24g
 # Image tag and container name per working copy: a local run and a CI job on the same
 # machine would otherwise overwrite each other's image and remove each other's container.
 COPY_ID  := $(shell printf '%s' '$(CURDIR)' | cksum | cut -d' ' -f1)
@@ -103,7 +105,7 @@ image:
 # Fixed name: a killed docker client leaves the container running; the next run removes it first.
 ci: image fetch
 	docker rm -f $(CONTAINER) >/dev/null 2>&1 || true
-	docker run --rm --name $(CONTAINER) --network none --memory 24g --user $$(id -u):$$(id -g) -e HOME=/tmp \
+	docker run --rm --name $(CONTAINER) --network none --memory $(MEMORY) --user $$(id -u):$$(id -g) -e HOME=/tmp \
 		-v $(CURDIR):$(CURDIR) -w $(CURDIR) $(IMAGE) $(MAKE) verify JOBS=$(JOBS) CC=$(CC) ANALYZE_CC=$(ANALYZE_CC)
 
 clean:
