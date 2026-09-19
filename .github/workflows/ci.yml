@@ -95,6 +95,37 @@ jobs:
             build/toolchain.txt
             build/logs/
 
+  # Nightly only: the model-gated suites. Two fixtures (~1.9 GB) are fetched through
+  # geistlib's pinned targets, cached by the lock file, and kept outside build/deps —
+  # every `make fetch` wipes the clones, models included.
+  nightly-models:
+    name: linux x86_64 (models, nightly)
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      # versions.mk pins the engine revision, and that revision carries the model pins,
+      # so the lock file is the honest cache key. One entry of ~1.9 GB, well inside the
+      # repository's 10 GB budget (geistlib's cache thrashing is exactly what to avoid, TODO F10).
+      - uses: actions/cache@v4
+        with:
+          path: build/models
+          key: geistkit-models-${{ hashFiles('versions.mk') }}
+      - run: make fetch-models
+      - run: make ci MODELS=1 JOBS=4
+      - if: always()
+        run: cat build/verify.txt >>"$GITHUB_STEP_SUMMARY" 2>/dev/null || echo "no verify.txt" >>"$GITHUB_STEP_SUMMARY"
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: verify-models
+          path: |
+            build/verify.txt
+            build/results.tsv
+            build/toolchain.txt
+            build/logs/
+
   # No Docker on hosted macOS: native, toolchain from the matrix.
   macos:
     name: macos ${{ matrix.runner }} (${{ matrix.cc }})

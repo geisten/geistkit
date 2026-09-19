@@ -1,0 +1,21 @@
+# MODELS=1 on Linux x86_64 without AVX-512: GitHub-hosted ubuntu-24.04, where the nightly runs.
+# unit/asan counts follow the model-free profile for this platform (one AVX-512 kernel test skips);
+# int/e2e were measured on AVX-512 hardware and are CPU-feature independent. First nightly confirms.
+geistlib.unit.passed             >=  39
+geistlib.unit.skipped            <=  25
+geistlib.asan.passed             >=  39
+geistlib.asan.skipped            <=  25
+# test-int: Qwen3.5 activates test_qwen35_load_int and test_qwen35_e2e_int.
+# 45 still skip, and honestly so: 26 want the Gemma 4 E2B fixture (3.1 GB), 3 the audio tower,
+# 2 Qwen3-0.6B, 2 SmolLM2-360M, the rest safetensors dumps. Lower this by adding fixtures.
+geistlib.int.passed              >=  5
+geistlib.int.skipped             <=  45
+geistlib.int.failed              ==  0
+geistlib.int.error               ==  0
+geistlib.e2e.passed              >=  1
+geistlib.e2e.skipped             <=  8
+geistlib.e2e.failed              ==  0
+geistlib.e2e.error               ==  0
+geistshell.test.passed           >=  61
+geistshell.test.skipped          <=  1
+geistshell.test.host_skipped     ==  0
