@@ -5,9 +5,12 @@ geistlib.unit.passed             >=  39
 geistlib.unit.skipped            <=  25
 geistlib.asan.passed             >=  39
 geistlib.asan.skipped            <=  25
-# test-int: Qwen3.5 activates test_qwen35_load_int and test_qwen35_e2e_int.
-# 45 still skip, and honestly so: 26 want the Gemma 4 E2B fixture (3.1 GB), 3 the audio tower,
-# 2 Qwen3-0.6B, 2 SmolLM2-360M, the rest safetensors dumps. Lower this by adding fixtures.
+# The Gemma fixture and the audio tower are fetched here too, so these counts are now far below
+# what the run produces (27/22 and 4/5 on AVX-512 hardware). They are left loose on purpose:
+# this pool was never measured, and a looser requirement can only miss a regression, while an
+# invented one turns the nightly red for no reason. Tighten from the first nightly artifact.
+# Whether test_audio_attn_w8a8_parity_int drifts here as well depends on the kernel path the
+# CPU takes — that is one of the things the first run answers.
 geistlib.int.passed              >=  5
 geistlib.int.skipped             <=  45
 geistlib.int.failed              ==  0

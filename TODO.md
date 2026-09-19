@@ -523,3 +523,40 @@ Streuung auf amd-desktop: ruhig isoliert 700,3 prefill / 110,4 decode (0,5 %), i
 - [ ] **P4 Sicherheit:** Fuzzing für GGUF, safetensors, WAV und Tokenizer; geistshell-Isolation (bwrap oder Landlock), reservierte Memory-Namen, `realpath` im Workdir.
 - [ ] **Pi 5:** [#3](https://github.com/geisten/geistkit/issues/3).
 - [ ] Kleinere Befunde: `-j`-Races in geist-memory, doppelter Kommentarblock im geistshell-Makefile, `geist-diktat` pinnt noch v0.10.8, nvim-Issues #19/#20/#24.
+
+---
+
+## 19.09.: Gemma-Fixture und Audio-Tower im Modellprofil
+
+`make fetch-models` holt jetzt zusätzlich die Gemma-4-E2B-Fixture und den Audio-Tower über geistlibs Targets; `link-models` legt den Tower nach `audio_bench/`, wo die Tests ihn suchen. geist-diktats WER-Test braucht **nichts** im Engine-Klon: Er liest Modell und Tower aus `GEIST_DIKTAT_DATA` und seine WAV aus den eigenen Fixtures — und es darf auch nichts dort liegen, weil sein `sync-engine` ein `geistlib/`-Verzeichnis ablehnt, das kein Git-Checkout ist (genau darüber bin ich zuerst gestolpert).
+
+**Gemessen auf amd-desktop, Profil `linux-x86_64-avx512-model`** (bestanden/übersprungen/fehlgeschlagen):
+
+| Suite | modellfrei | Qwen3.5 + BitNet | **plus Gemma + Tower** |
+|---|---|---|---|
+| geistlib `test-unit` | 40/24/0 | 40/24/0 | **44/20/0** |
+| geistlib **ASan** | 40/24/0 | 40/24/0 | **44/20/0** |
+| geistlib `test-int` | 2/48/0 | 5/45/0 | **27/22/1** |
+| geistlib `test-e2e` | 0/9/0 | 1/8/0 | **4/5/0** |
+| geist-diktat `test-e2e` (WER) | – | – | **bestanden, WER 0,0 %** |
+
+Vier Tests mehr laufen damit auch **unter AddressSanitizer** — das war nicht vorhergesehen, sondern gemessen.
+
+**WER:** 0,0 % auf dem LibriSpeech-Clip. Der Test gatet sich selbst bei 15 %; der Produktplan schlägt ≤ 10 % vor. geistkit setzt **kein** eigenes WER-Gate: Ein Clip trägt keine Schwelle, und der Abnahmetext verlangt ein vorher vereinbartes, unabhängiges Testset. Der Messwert steht als `geist-diktat.e2e.wer_pct` in `results.tsv`. **p95 und RTF bleiben unmessbar**, auch mit allen Fixtures: Der Test misst die Wandzeit auf ganze Sekunden gerundet und nennt seine tok/s-Zeile im Kommentar selbst bedeutungslos.
+
+**Kein Cache für die Modelle, mit Zahlen begründet:** Der Satz ist 5,4 GB. Ein Eintrag belegt 54 % des 10-GB-Budgets, der nächste Lock-Bump legt einen zweiten an — genau die Verdrängung aus F10. Alle vier Dateien zu holen dauerte 76 s, etwa so lange wie 5,4 GB aus dem Cache zu restaurieren. Platz auf gehosteten Runnern: 5,4 GB Modelle plus rund 1,2 GB Klone und Build-Bäume gegen etwa 14 GB frei.
+
+**Laufzeit:** modellfrei 262 s, mit Modellen 549 s. Gehört damit weiter nur in den nächtlichen Job.
+
+### F14 – geistlib: Audio-Paritätstest driftet auf x86 (Repo geistlib)
+
+- [ ] `test_audio_attn_w8a8_parity_int` scheitert mit vorhandenem Tower auf amd-desktop: „drifts from reference“ für `attn+lconv` und `defaults` (1-cos schlechtester Wert 1,582e-01, max|diff| 6,7). Der Fall `attn-W8A8` allein besteht (5,541e-02).
+- **Warum es niemandem auffiel:** geistlib führt genau diesen Test nur im Job „audio harness smoke (Linux arm64, NEON)“ aus. Der x86-Pfad mit AVX-512/VNNI-Kerneln hat kein Gate.
+- **Die Vorgabe bleibt `failed == 0`.** Ein driftender Paritätstest ist der Defekt; ihn wegzulockern würde genau das verbergen, wofür das Profil existiert. Das Modellprofil auf AVX-512-Hardware ist deshalb rot, bis der Fix da ist.
+
+### Folgepunkte
+
+- [ ] **Qwen3-0.6B und SmolLM2-360M** (~1 GB zusammen) wecken 4 weitere Integrations- und 2 e2e-Tests. Bestes verbliebenes Verhältnis.
+- [ ] Von den 22 verbleibenden int-Skips warten 7 auf safetensors-Dumps, der Rest auf Vision-Tower und weitere Audio-Fixtures.
+- [ ] Das gehostete Profil `linux-x86_64-model` behält bewusst die lockeren Zähler, bis die erste Nacht mit Gemma echte Werte liefert — auch die Frage, ob der Paritätstest dort ebenfalls driftet.
+- [ ] Lock auf den Merge von [geistlib#423](https://github.com/geisten/geistlib/pull/423) heben, damit Gemma und Tower per Revision und SHA-256 gepinnt sind statt über `resolve/main`.

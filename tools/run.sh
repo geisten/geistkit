@@ -27,6 +27,12 @@ rc=$?
         # geistlib tests/bench_perf_sweep: one JSON object per seq_len, core metrics are the
         # mean over --repeats. Only the four flat keys below are taken, so the nested
         # "samples" arrays cannot leak in: their keys simply never match.
+        # geist-diktat tests/e2e_wer.sh prints the scorer line; the test gates itself at 15 %,
+        # this keeps the number as data so a drift is visible before it crosses the threshold.
+        /aggregate WER:/ {
+            if (match($0, /aggregate WER: [0-9.]+/))
+                printf "%s.wer_pct\t%s\n", k, substr($0, RSTART + 15, RLENGTH - 15)
+        }
         /"prefill_tps":/ {
             n = split($0, part, /[,{}]/)
             for (i = 1; i <= n; i++) {
