@@ -38,7 +38,7 @@ verifizieren. Danach neue Programme daraus zusammensetzen.
 
 ## Stand (15.09.2026)
 
-**Letzter `make ci`** (17.09., nach den ersten fünf Merges, Profil `linux-x86_64-avx512`):**
+**Letzter `make ci`** (17.09., nach den ersten fünf Merges, Profil `linux-x86_64-avx512`):
 
 | Vorgabe | Wert | Fix |
 |---|---|---|
@@ -372,3 +372,5 @@ Der geistkit-Runner läuft (`AMD_DESKTOP_RUNNER=on`), und der eigene Leg baut je
 - **Muster:** Beim OpenMP-Auslagern verliert der Rumpf offenbar die `target`-Attribute, sodass VPDPBUSD in einer Funktion ohne AVX512-VNNI landet. F8 hat dieselbe Datei schon einmal umgebaut („Cannot select VPDPBUSD“), damals für den Nicht-OpenMP-Pfad.
 - **Nicht abgedeckt upstream:** geistlib baut Linux mit gcc; clang-x86 mit OpenMP wird nirgends geprüft.
 - **Wirkung in geistkit:** Der `clang-19`-Leg auf `amd-desktop` bleibt rot, bis das behoben ist.
+
+**19.09., Plattform-Stand mit Lock `0f35be4a`:** Linux x86_64 und arm64 grün, macOS arm64 beide Compiler grün, **macOS Intel erstmals grün** (beide Compiler, gemessen 39/25 für unit und ASan, geistshell 60/2/1) — F11 wirkt. Die Zähler stehen jetzt als Vorgaben in `acceptance.d/darwin-x86_64.tsv` statt der Platzhalter. Offen ist allein der `clang-19`-Leg auf `amd-desktop` (F12).

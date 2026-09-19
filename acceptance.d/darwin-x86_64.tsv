@@ -1,5 +1,9 @@
-# macOS Intel: macos-15-intel, Apple clang 17 and brew llvm@19.
-# Red today: geistlib does not build (src/base/hw_probe.c:58 unused sysctl_bool under -Werror) -> F8.
-# The two lines force both suites to run; replace them with the measured counts once F8 is in the lock.
-geistlib.unit.passed             >=  1
-geistshell.test.passed           >=  1
+# macOS Intel: macos-15-intel, Apple clang 17 and brew llvm@19 — measured identically on both.
+# Green since geistlib#421 (the -Wno-pass-failed fix for sanitizer builds). Counts are a ratchet.
+geistlib.unit.passed             >=  39
+geistlib.unit.skipped            <=  25   # no AVX-512 here; models/dumps -> F6b
+geistlib.asan.passed             >=  39
+geistlib.asan.skipped            <=  25
+geistshell.test.passed           >=  60
+geistshell.test.skipped          <=  2    # test_cli_gym; test_cli_machine_recovery (host-gated)
+geistshell.test.host_skipped     <=  1    # geistshell's own CI allows host skips on macOS
