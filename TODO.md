@@ -478,3 +478,30 @@ Also ~3 % Streuung beim Prefill und ~7 % beim Decode unter realen Bedingungen, n
 - [ ] Achtung bei den Zielwerten: Die Zahlen in `doc/PRODUCT-PLAN.md` (WER ≤ 10 %, mit Rauschen ≤ 25 %, p95 ≤ 3 s, RTF ≤ 0,8) sind dort ausdrücklich **vorgeschlagen**, und der Abnahmetext verlangt eine „vorher vereinbarte und auf einem unabhängigen Testset gemessene“ WER. Vor einem Gate braucht es also erst die Vereinbarung und das Testset.
 - [ ] Untergrenzen für `linux-x86_64-model` (gehostet) nachtragen, sobald ein paar nächtliche Läufe die Spanne zeigen.
 - [ ] Mit den 26 Gemma-Skips in `test-int` fällt dann auch der größte Brocken der übersprungenen Integrationstests.
+
+---
+
+## 19.09.: P2 und P3 sind gemergt
+
+**P2 ([#4](https://github.com/geisten/geistkit/pull/4)):** `MODELS=1` schaltet `test-int` und `test-e2e` dazu und wechselt auf das Profil `<plattform>-model`. `make fetch-models` nutzt geistlibs gepinnte Targets (keine URL, keine Prüfsumme dupliziert), legt die Modelle nach `build/models` — außerhalb von `build/deps`, weil `fetch-dep.sh` jeden Klon per `git clean -fdx` leert — und `link-models` hardlinkt sie offline zurück.
+
+Gemessen: `test-int` 2/48/0 → **5/45/0**, `test-e2e` 0/9/0 → **1/8/0**, `test-unit` unverändert 40/24/0. Voller Lauf 291 s statt 264 s, Download 1,9 GB in 41 s.
+
+**Befund, der eine Annahme korrigierte:** Ein erzwungenes `GEIST_GGUF_PATH` auf Qwen3.5 macht die Suite **rot** (1 Unit-, 6 Integrationstests), weil sie gegen die Gemma-Fixture geschrieben sind. Richtig ist, die Modelle nur bereitzustellen und jeden Test seine Fixture selbst wählen zu lassen.
+
+**Warum 45 int-Tests weiter übersprungen werden:** 26 warten auf Gemma 4 E2B (3,1 GB), 3 auf den Audio-Tower, 2 auf Qwen3-0.6B, 2 auf SmolLM2-360M, der Rest auf safetensors-Dumps. Bestes Verhältnis: Qwen3 plus SmolLM2, zusammen ~1 GB für 4 weitere Tests.
+
+**P3 ([#5](https://github.com/geisten/geistkit/pull/5)):** `geistlib.bench.prefill_tps`, `decode_tps`, `rss_mb` und `threads` landen in `results.tsv`, Quelle ist das JSON von `tests/bench_perf_sweep` (Mittel über `--repeats`, Warmup verworfen), gemessen mit BitNet und **4 festgenagelten Threads**.
+
+Streuung auf amd-desktop: ruhig isoliert 700,3 prefill / 110,4 decode (0,5 %), im vollen `verify` ruhig 696,6 / 110,5, direkt nach Builds 680,3 / 103,5 — real also ~3 % prefill und ~7 % decode. Kosten: ~7 s.
+
+**Vorgabenform bewusst keine Ratsche:** `prefill_tps >= 150`, `decode_tps >= 25`, `rss_mb <= 4500`, `threads == 4`. Untergrenzen bei etwa einem Viertel fangen das, was wirklich passiert — skalarer Fallback, `-O0`, OpenMP aus —, je ein Faktor statt Prozente. Eine Ratsche würde bei Rauschen rot gehen und dann ignoriert werden. Die Untergrenzen gelten nur im gemessenen Profil; der gehostete Runner behält nur `threads == 4`, weil eine erfundene Zahl für eine nie gemessene Maschine schlechter ist als keine.
+
+**WER, p95 und RTF bleiben unmessbar**, und zwar begründet: `tests/e2e_wer.sh` braucht Gemma 4 E2B **und** den Audio-Tower (~3,3 GB zusammen), sonst SKIP mit Exit 0. Dieselbe fehlende Fixture blockiert die 26 Gemma-wartenden Integrationstests. Außerdem sind die Zahlen in `doc/PRODUCT-PLAN.md` als *vorgeschlagen* markiert, und der Abnahmetext verlangt eine vorher vereinbarte WER auf unabhängigem Testset — die Vereinbarung kommt also vor dem Gate.
+
+### F13 – geistshell: `test_cli_device` fällt unter Last um (Repo geistshell)
+
+- [ ] `test/test_cli_device.sh`, zweite Prüfung: „the plant readings never reached the journaled context“. Der Test wartet offenbar mit fester Frist darauf, dass Messwerte des Device-Kanals im Journal erscheinen.
+- **Beleg:** ruhig 6 von 6 Läufen grün (beide Engine-Revisionen), unter Last 58/1/0 statt 61/1/0. In der CI reproduzierbar im Job „linux x86_64 (models, nightly)“ auf gehostetem `ubuntu-24.04` mit 4 vCPU (Lauf 35446906881), während derselbe Lauf auf dem Ryzen 9 9950X grün ist.
+- **Die Vorgabe wird nicht aufgeweicht.** Ein Test, der unter Last falsch fehlschlägt, ist der Fehler. Fix upstream: auf das Ereignis warten statt auf Zeit.
+- **In Arbeit** als PR in geistshell.
