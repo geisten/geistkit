@@ -374,3 +374,24 @@ Der geistkit-Runner läuft (`AMD_DESKTOP_RUNNER=on`), und der eigene Leg baut je
 - **Wirkung in geistkit:** Der `clang-19`-Leg auf `amd-desktop` bleibt rot, bis das behoben ist.
 
 **19.09., Plattform-Stand mit Lock `0f35be4a`:** Linux x86_64 und arm64 grün, macOS arm64 beide Compiler grün, **macOS Intel erstmals grün** (beide Compiler, gemessen 39/25 für unit und ASan, geistshell 60/2/1) — F11 wirkt. Die Zähler stehen jetzt als Vorgaben in `acceptance.d/darwin-x86_64.tsv` statt der Platzhalter. Offen ist allein der `clang-19`-Leg auf `amd-desktop` (F12).
+
+---
+
+## 19.09., Richtigstellung: es gab kein F12, und das Gate ist überall grün
+
+**F12 war ein Messfehler von mir, kein Upstream-Defekt.** Ich habe den diktat-Build manuell mit `GEIST_REPO`, aber ohne `GEIST_REF` aufgerufen. Also baute diktat seine **eigene** gepinnte Engine v0.10.8 (`bb751c5`), nicht den Lock-Stand. Dort stürzt clang tatsächlich ab, und zwar mit clang-19 **und** clang-21 — es ist also kein LLVM-Bug, sondern ein Codemuster, das jeder clang ablehnt. Auf `main` (`0f35be4`) ist es längst behoben: #415 hat die Intrinsics nach `w8a8_avx512vnni_row` mit `AUDIO_VNNI_TARGET` gelegt, der OpenMP-Rumpf ruft sie nur auf. Die echte geistkit-Pipeline übergibt beide Variablen und war nie betroffen.
+
+Der rote clang-Leg hatte eine andere, ebenfalls eigene Ursache: die fehlende zu clang passende OpenMP-Laufzeit im Image (`libomp-19-dev`).
+
+**Übrig bleibt daraus ein sinnvoller Beitrag:** [geistlib#422](https://github.com/geisten/geistlib/pull/422) ergänzt den fehlenden CI-Leg `build-test-x86_64-clang`. Jeder x86_64-Leg baute bisher mit gcc, die macOS-clang-Legs bauen eine andere Konfiguration — die Schnittmenge „clang + x86_64 + OpenMP-Outlining“ hatte kein Gate. Nachweis: Auf v0.10.8 fängt der Leg den Absturz, auf `main` ist er grün (39/24/0).
+
+**Plattform-Stand, Lauf `35437016697` (Lock `0f35be4a`): alle acht Legs grün.**
+
+| Leg | Ergebnis |
+|---|---|
+| Linux x86_64, Linux arm64 (hosted) | grün |
+| macOS arm64, Apple clang und llvm@19 | grün |
+| macOS Intel, Apple clang und llvm@19 | grün |
+| amd-desktop, gcc-14 **und clang-19** | grün |
+
+- [ ] **Folgepunkt:** `geist-diktat` pinnt weiterhin v0.10.8 und trifft den Absturz bei clang-Builds. Ein Pin-Bump auf den Lock-Stand löst es ohne Engine-Änderung.
