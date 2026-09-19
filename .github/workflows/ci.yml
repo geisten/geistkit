@@ -44,10 +44,17 @@ jobs:
     name: linux x86_64 (amd-desktop, container, offline)
     if: github.event_name != 'pull_request' && vars.AMD_DESKTOP_RUNNER == 'on'
     runs-on: [self-hosted, Linux, X64, amd-desktop]
+    # One runner, so pushes and the nightly schedule would queue behind each other:
+    # the newest state is the interesting one, cancel the older run.
+    concurrency:
+      group: amd-desktop-${{ github.ref }}
+      cancel-in-progress: true
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
-      - run: make ci JOBS=8
+      # 16 of 32 threads: a local run at 12 took 315 s, while -j32 with the ASan
+      # builds exhausted memory. Raise further only with a measured peak.
+      - run: make ci JOBS=16
       - if: always()
         run: cat build/verify.txt >>"$GITHUB_STEP_SUMMARY" 2>/dev/null || echo "no verify.txt" >>"$GITHUB_STEP_SUMMARY"
       - if: always()
