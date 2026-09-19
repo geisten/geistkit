@@ -560,3 +560,37 @@ Vier Tests mehr laufen damit auch **unter AddressSanitizer** — das war nicht v
 - [ ] Von den 22 verbleibenden int-Skips warten 7 auf safetensors-Dumps, der Rest auf Vision-Tower und weitere Audio-Fixtures.
 - [ ] Das gehostete Profil `linux-x86_64-model` behält bewusst die lockeren Zähler, bis die erste Nacht mit Gemma echte Werte liefert — auch die Frage, ob der Paritätstest dort ebenfalls driftet.
 - [ ] Lock auf den Merge von [geistlib#423](https://github.com/geisten/geistlib/pull/423) heben, damit Gemma und Tower per Revision und SHA-256 gepinnt sind statt über `resolve/main`.
+
+---
+
+## 19.09.: Gemma-Fixture drin, F14 geklärt — alles grün
+
+**Pins upstream** ([geistlib#423](https://github.com/geisten/geistlib/pull/423)): Gemma E2B (3 106 738 272 B), E4B (4 977 171 584 B) und der Audio-Tower (614 464 839 B) laufen jetzt über feste HF-Revisionen mit SHA-256, wie die anderen vier seit #413. Die E2B-Fixture wird auch in der Datei-Regel geprüft, weil `AUTO_FETCH_MODEL=1` direkt daran hängt.
+
+**Modellprofil** ([geistkit#6](https://github.com/geisten/geistkit/pull/6)), gemessen auf amd-desktop:
+
+| Suite | modellfrei | Qwen3.5+BitNet | plus Gemma+Tower |
+|---|---|---|---|
+| unit | 40/24/0 | 40/24/0 | **44/20/0** |
+| ASan | 40/24/0 | 40/24/0 | **44/20/0** |
+| int | 2/48/0 | 5/45/0 | **27/22/0** |
+| e2e | 0/9/0 | 1/8/0 | **4/5/0** |
+| diktat WER-e2e | – | – | **bestanden, WER 0,0 %** |
+
+**Kein Cache, mit Begründung:** Modellsatz 5,4 GB wäre 54 % des 10-GB-Budgets, der nächste Lock-Bump ein zweiter Eintrag — genau F10. Alle vier zu holen dauert 76 s, etwa so lang wie 5,4 GB zu restaurieren. Laufzeit: modellfrei 262 s, mit Modellen 549 s, bleibt nächtlich.
+
+**WER erfasst, nicht gegatet:** `geist-diktat.e2e.wer_pct` = 0,0. Ein Clip trägt keine Schwelle, der Test gatet sich intern bei 15 %, und der Abnahmetext verlangt ein vorab vereinbartes unabhängiges Testset. Vorschlag für später: 10 % auf einem Mehr-Clip-Set. **p95 und RTF bleiben unmessbar**, der Test rundet die Wandzeit auf ganze Sekunden und nennt seine tok/s-Zeile selbst bedeutungslos.
+
+### F14 – erledigt: der Test war im Unrecht, nicht der Kernel ([geistlib#424](https://github.com/geisten/geistlib/pull/424))
+
+`test_audio_attn_w8a8_parity_int` verfehlte auf x86 das `worst`-Kriterium (0,842 gegen 0,85), während der Mittelwert bei 6,1e-03 lag. Beleg: skalarer Kernel, AVX2 und AVX-512/VNNI liefern **bit-identische** Werte; die unsigned-`+128`-Korrektur des VNNI-Pfads hebt sich exakt auf.
+
+Entscheidend war die Trennschärfe: Mit künstlich entfernter `+128`-Korrektur — dem Defekt, vor dem der Code warnt — liest sich der `worst`-Wert des **kaputten** Pfads besser (3,1e-02) als der des korrekten (5,5e-02), während der Mittelwert um Faktor 8 bis 43 trennt. Eine enge `worst`-Schwelle kauft also keine Erkennung. Deshalb `COS_WORST_MIN` 0,85 → 0,80, Mittelwert-Gate unverändert 0,99. Die Schwellen waren laut Kommentar auf macOS und Pi 5 kalibriert, x86_64 war nie gemessen.
+
+Dazu neuer CI-Leg `audio-parity-x86_64` in geistlib: Der Paritätstest lief nur im arm64-NEON-Job, der AVX-512/VNNI-Audiopfad hatte gar kein Gate — dieselbe Lückenform wie #415 und #422. In `CI_COVERAGE.md` fehlte der Audio-Tower in der Fixture-Tabelle völlig.
+
+**Beleg, Lauf `35468412226`: alle zehn Jobs grün, beide Modelljobs eingeschlossen** (gehostet und amd-desktop).
+
+### Noch übersprungen (22 int)
+
+7 safetensors-Dumps, 2 Qwen3-0.6B, 2 SmolLM2-360M, Rest Vision-Tower und weitere Audio-Fixturen. Qwen3 plus SmolLM2 wären ~1 GB für 4 int und 2 e2e — bestes verbliebenes Verhältnis.
