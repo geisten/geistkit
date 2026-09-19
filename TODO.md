@@ -505,3 +505,21 @@ Streuung auf amd-desktop: ruhig isoliert 700,3 prefill / 110,4 decode (0,5 %), i
 - **Beleg:** ruhig 6 von 6 Läufen grün (beide Engine-Revisionen), unter Last 58/1/0 statt 61/1/0. In der CI reproduzierbar im Job „linux x86_64 (models, nightly)“ auf gehostetem `ubuntu-24.04` mit 4 vCPU (Lauf 35446906881), während derselbe Lauf auf dem Ryzen 9 9950X grün ist.
 - **Die Vorgabe wird nicht aufgeweicht.** Ein Test, der unter Last falsch fehlschlägt, ist der Fehler. Fix upstream: auf das Ereignis warten statt auf Zeit.
 - **In Arbeit** als PR in geistshell.
+
+**F13 gemergt** ([geistshell#150](https://github.com/geisten/geistshell/pull/150)), Lock nachgezogen. Der Test wartete eine feste Anzahl Versuche auf ein Physikmodell, das nach Wandzeit fortschreibt, und nagelte eine nicht determinierbare Temperatur fest (264–635 Deci-Grad über 20 Läufe gemessen). **Gravierender war:** Die Journal-Prüfung hing nicht an ihrem eigenen Lauf — alle Agent-Läufe hängen an dieselbe Journal-Datei an, also konnte ein späterer Block das `grep` erfüllen. Der Test war damit teils falsch-positiv und ist jetzt strenger: Journal vor dem geprüften Lauf geleert, Warten auf das Ereignis mit Budget, Aussage statt Zahl geprüft. Nachweis: 10 Läufe ruhig und 10 Läufe auf 2 CPUs mit 6 Spinnern, alle grün.
+
+**Beleg in der Praxis, Lauf `35448435206`: alle zehn Jobs grün**, auch `linux x86_64 (models, nightly)` auf dem gehosteten Runner, der zuvor genau daran scheiterte.
+
+| Job | Ergebnis |
+|---|---|
+| Linux x86_64, Linux arm64 (hosted) | grün |
+| macOS arm64 und Intel, je Apple clang und llvm@19 | grün |
+| amd-desktop, gcc-14 und clang-19 | grün |
+| Modellprofil, gehostet **und** amd-desktop | grün |
+
+### Als Nächstes
+
+- [ ] **Gemma 4 E2B plus Audio-Tower ins Modellprofil** (~3,3 GB, in geistlib gepinnt). Das ist der Hebel mit dem größten Ertrag: Es weckt 26 der 45 noch übersprungenen Integrationstests **und** macht WER, p95 und RTF überhaupt erst messbar, also den Rest von P3. Vorher zu klären: die WER-Vereinbarung, weil der Abnahmetext ein unabhängiges Testset verlangt und die Zahlen im Produktplan nur vorgeschlagen sind.
+- [ ] **P4 Sicherheit:** Fuzzing für GGUF, safetensors, WAV und Tokenizer; geistshell-Isolation (bwrap oder Landlock), reservierte Memory-Namen, `realpath` im Workdir.
+- [ ] **Pi 5:** [#3](https://github.com/geisten/geistkit/issues/3).
+- [ ] Kleinere Befunde: `-j`-Races in geist-memory, doppelter Kommentarblock im geistshell-Makefile, `geist-diktat` pinnt noch v0.10.8, nvim-Issues #19/#20/#24.
