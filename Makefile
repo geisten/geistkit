@@ -16,6 +16,8 @@ ENGINE   := $(DEPS)/geistlib
 # ponytail: fixed at 8. -j32 with ASan builds exhausted memory; raise it once the peak is measured.
 JOBS     ?= 8
 IMAGE    := geistkit-toolchain
+# Container name per working copy: a local run and a CI job would otherwise remove each other's container.
+CONTAINER := geistkit-ci-$(shell printf '%s' '$(CURDIR)' | cksum | cut -d' ' -f1)
 RUN      := sh tools/run.sh
 
 # Toolchain: gcc-14 as in the geisten CI, unless CC is given (macOS: clang or brew llvm@19).
@@ -98,9 +100,9 @@ image:
 # Same path inside the container, so the absolute ENGINE paths match.
 # Fixed name: a killed docker client leaves the container running; the next run removes it first.
 ci: image fetch
-	docker rm -f geistkit-ci >/dev/null 2>&1 || true
-	docker run --rm --name geistkit-ci --network none --memory 24g --user $$(id -u):$$(id -g) -e HOME=/tmp \
-		-v $(CURDIR):$(CURDIR) -w $(CURDIR) $(IMAGE) $(MAKE) verify JOBS=$(JOBS)
+	docker rm -f $(CONTAINER) >/dev/null 2>&1 || true
+	docker run --rm --name $(CONTAINER) --network none --memory 24g --user $$(id -u):$$(id -g) -e HOME=/tmp \
+		-v $(CURDIR):$(CURDIR) -w $(CURDIR) $(IMAGE) $(MAKE) verify JOBS=$(JOBS) CC=$(CC) ANALYZE_CC=$(ANALYZE_CC)
 
 clean:
 	rm -rf build

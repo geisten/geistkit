@@ -40,27 +40,33 @@ jobs:
 
   # Like pi5: enabled by the repository variable once a geistkit runner is registered and online.
   # Without the gate every push queues a job for 24 h and is then cancelled.
+  # Both compilers here, on our own hardware: the hosted legs cover gcc-14, and
+  # geist-memory's CI shows clang matters (its own matrix is gcc-14 + clang-19).
   amd-desktop:
-    name: linux x86_64 (amd-desktop, container, offline)
+    name: linux x86_64 (amd-desktop, ${{ matrix.cc }}, container, offline)
     if: github.event_name != 'pull_request' && vars.AMD_DESKTOP_RUNNER == 'on'
+    strategy:
+      fail-fast: false
+      matrix:
+        cc: [gcc-14, clang-19]
     runs-on: [self-hosted, Linux, X64, amd-desktop]
     # One runner, so pushes and the nightly schedule would queue behind each other:
     # the newest state is the interesting one, cancel the older run.
     concurrency:
-      group: amd-desktop-${{ github.ref }}
+      group: amd-desktop-${{ matrix.cc }}-${{ github.ref }}
       cancel-in-progress: true
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
       # 16 of 32 threads: a local run at 12 took 315 s, while -j32 with the ASan
       # builds exhausted memory. Raise further only with a measured peak.
-      - run: make ci JOBS=16
+      - run: make ci JOBS=16 CC=${{ matrix.cc }}
       - if: always()
         run: cat build/verify.txt >>"$GITHUB_STEP_SUMMARY" 2>/dev/null || echo "no verify.txt" >>"$GITHUB_STEP_SUMMARY"
       - if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: verify-amd-desktop
+          name: verify-amd-desktop-${{ matrix.cc }}
           path: |
             build/verify.txt
             build/results.tsv
