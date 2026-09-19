@@ -19,3 +19,26 @@ geistlib.e2e.error               ==  0
 geistshell.test.passed           >=  61
 geistshell.test.skipped          <=  1
 geistshell.test.host_skipped     ==  0
+
+# Throughput of geistlib's benchmark model (BitNet b1.58 2B-4T, i2_s), 128-token prefill
+# plus 16 decode steps, mean over 10 repeats after a discarded warmup, 4 pinned threads.
+#
+# Measured on amd-desktop (Ryzen 9 9950X, gcc-14): five isolated runs gave a median of
+# 700.3 prefill / 110.4 decode tok/s with 0.6 % / 0.5 % run-to-run spread; the same step
+# inside a full verify, right after the builds, gave 680.3 / 103.5 — so real spread is
+# ~3 % prefill and ~7 % decode, not the 0.5 % of an idle box.
+#
+# The floors sit near a quarter of that on purpose, and are NOT a ratchet. A ratchet on a
+# throughput figure goes red on noise and on any slower host, which teaches people to
+# ignore it. These catch the cliffs that actually happen — scalar fallback instead of
+# AVX-512/VNNI, -O0 slipping in, OpenMP off, a kernel returning early — each of which
+# costs a factor, not a few percent. Same reasoning as geistlib's own benchmark/perf_gate.py
+# ("floors set well below the real number"). It also keeps the hosted AVX-512 runners honest:
+# that pool is mixed and slower than this desktop, but nowhere near 4x slower.
+geistlib.bench.prefill_tps       >=  150
+geistlib.bench.decode_tps        >=  25
+# RSS with a 1.19 GB model: 2865 MB, spread 0.0 %. Catches weights being copied instead of mapped.
+geistlib.bench.rss_mb            <=  4500
+# Provenance, and it makes a silently vanished bench step fail instead of going unnoticed:
+# a missing measured value is a failure (tools/verify.sh).
+geistlib.bench.threads           ==  4

@@ -447,3 +447,34 @@ Neu laufen `test_qwen35_load_int`, `test_qwen35_e2e_int` und drei weitere Integr
 - [ ] **Folgepunkt, größter Block:** Gemma 4 E2B (3,1 GB) löst 26 Skips, treibt den Cache aber auf ~5 GB von 10 GB Budget.
 - [ ] **Folgepunkt:** `make bench` als nächtlicher Messschritt mit Protokoll (BitNet), nicht als Gate.
 - [ ] **Nicht abgedeckt:** geist-memory `bench-model` und `test-e2e` brauchen ein eigenes Embedding-Modell (`bitnet-embedding-0.6b-geist.gguf`), das der nightly-Workflow von geist-memory selbst erzeugt. geist-diktat `test-e2e` braucht Audio-Tower und Gemma.
+
+---
+
+## 19.09.: P3 — Messwerte neben Pass/Fail
+
+`results.tsv` enthält jetzt nicht nur Zähler, sondern Zahlen. Gemessen wird der Durchsatz von geistlibs Benchmark-Modell (BitNet b1.58 2B-4T, i2_s) mit `tests/bench_perf_sweep`: 128-Token-Prefill plus 16 Decode-Schritte, Mittel über 10 Wiederholungen nach verworfenem Warmup, **4 festgenagelte Threads**. Das Werkzeug liefert JSON, `tools/run.sh` nimmt daraus `prefill_tps`, `decode_tps`, `rss_mb` und `threads` — kein Parsen von Fließtext.
+
+Damit hat BitNet endlich eine Aufgabe: Es aktiviert keinen Pass/Fail-Test, ist aber das Modell, an dem der Durchsatz hängt.
+
+**Streuung, gemessen auf amd-desktop (Ryzen 9 9950X, gcc-14):**
+
+| Bedingung | prefill tok/s | decode tok/s |
+|---|---|---|
+| 5 isolierte Läufe, ruhige Maschine | Median 700,3 (Streuung 0,6 %) | Median 110,4 (0,5 %) |
+| im vollen `verify`, ruhige Maschine | 696,6 | 110,5 |
+| im vollen `verify`, direkt nach Builds | 680,3 | 103,5 |
+
+Also ~3 % Streuung beim Prefill und ~7 % beim Decode unter realen Bedingungen, nicht die 0,5 % einer unbeschäftigten Maschine. RSS 2865 MB, Streuung 0,0 %.
+
+**Vorgabenform: Untergrenzen bei etwa einem Viertel des Medians, ausdrücklich keine Ratsche.** Eine Ratsche auf einem Durchsatzwert geht bei Rauschen und auf jeder langsameren Maschine rot — und wird dann ignoriert. Die Untergrenzen fangen die Klippen, die wirklich vorkommen: skalarer Fallback statt AVX-512/VNNI, versehentliches `-O0`, OpenMP aus, ein Kernel der zu früh zurückkehrt. Jede davon kostet einen Faktor, nicht ein paar Prozent. Dieselbe Begründung wie in geistlibs eigenem `benchmark/perf_gate.py`. Zusätzlich prüft `threads == 4`, dass die Messbedingung stimmte — und dass ein still verschwundener Bench-Schritt auffällt, weil ein fehlender Messwert als Fehler gilt.
+
+**Wo gemessen wird:** Der Schritt läuft bei jedem `MODELS=1`, also in beiden nächtlichen Läufen. Die Untergrenzen gelten aber nur im Profil `linux-x86_64-avx512-model`, das ich gemessen habe. Für den gehosteten Runner gibt es noch keine — dort habe ich nie gemessen, und eine erfundene Zahl ist schlechter als keine. Neu ist dafür der Job `nightly-models-desktop` auf eigener Hardware, wo die Last bekannt ist.
+
+### Nicht messbar, und warum
+
+**WER, p95 und RTF von geist-diktat gehen heute nicht.** `tests/e2e_wer.sh` braucht **beides**: `gemma4-e2b-Q4_K_M.gguf` (3,1 GB) **und** `audio_tower.safetensors`. Fehlt eines, endet das Skript mit SKIP und Exit 0. Keines von beiden liegt im Modellprofil. Halb gebaut wäre das schlechter als gar nicht, deshalb bleibt es offen:
+
+- [ ] Gemma-4-E2B-Fixture und Audio-Tower ins Modellprofil aufnehmen (≈3,3 GB zusätzlich, beide in geistlib gepinnt: `fetch-model`, `fetch-audio-tower`). Erst danach sind WER, p95 und RTF messbar — und erst dann lohnt sich ein Gate darauf.
+- [ ] Achtung bei den Zielwerten: Die Zahlen in `doc/PRODUCT-PLAN.md` (WER ≤ 10 %, mit Rauschen ≤ 25 %, p95 ≤ 3 s, RTF ≤ 0,8) sind dort ausdrücklich **vorgeschlagen**, und der Abnahmetext verlangt eine „vorher vereinbarte und auf einem unabhängigen Testset gemessene“ WER. Vor einem Gate braucht es also erst die Vereinbarung und das Testset.
+- [ ] Untergrenzen für `linux-x86_64-model` (gehostet) nachtragen, sobald ein paar nächtliche Läufe die Spanne zeigen.
+- [ ] Mit den 26 Gemma-Skips in `test-int` fällt dann auch der größte Brocken der übersprungenen Integrationstests.

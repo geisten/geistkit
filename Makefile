@@ -31,6 +31,13 @@ RUN      := sh tools/run.sh
 # which would delete gguf_artifacts/ on every fetch. MODELS=1 links them back in.
 MODELS     ?= 0
 MODELS_DIR := $(CURDIR)/build/models
+# Throughput measurement (MODELS=1). BitNet activates no pass/fail test — it is geistlib's
+# benchmark model — so this is where its numbers become data. Threads are pinned rather than
+# left to the host: the figure has to be comparable between runs, and 4 also matches the
+# hosted runners' vCPU count. Parameters otherwise as in geistlib's own cliff detector.
+BENCH_MODEL    ?= bitnet-2b4t-i2_s.gguf
+BENCH_THREADS  ?= 4
+BENCH_REPEATS  ?= 10
 
 # Toolchain: gcc-14 as in the geisten CI, unless CC is given (macOS: clang or brew llvm@19).
 # Static analysis needs clang: clang-19 in the container; set ANALYZE_CC natively.
@@ -78,6 +85,7 @@ test-geistlib: $(if $(filter 1,$(MODELS)),link-models)
 ifeq ($(MODELS),1)
 	$(RUN) geistlib.int      $(ENGINE) $(MAKE) -j$(JOBS) CC=$(CC) AUTO_FETCH_MODEL=0 test-int
 	$(RUN) geistlib.e2e      $(ENGINE) $(MAKE) -j$(JOBS) CC=$(CC) AUTO_FETCH_MODEL=0 test-e2e
+	$(RUN) geistlib.bench    $(ENGINE) sh -c 'set -e; T=$$(sh mk/detect-target.sh); $(MAKE) -j$(JOBS) CC=$(CC) TARGET=$$T bin/$$T/release/tests/bench_perf_sweep; OMP_NUM_THREADS=$(BENCH_THREADS) bin/$$T/release/tests/bench_perf_sweep --gguf gguf_artifacts/$(BENCH_MODEL) --seq-lens 128 --decode-n 16 --warmup 4 --repeats $(BENCH_REPEATS) --threads $(BENCH_THREADS)'
 endif
 
 SHELL_MAKE = $(MAKE) HOST_CC=$(CC) GEIST_REPO=$(ENGINE) GEIST_REF=$(ENGINE_geistshell)

@@ -19,3 +19,10 @@ geistlib.e2e.error               ==  0
 geistshell.test.passed           >=  61
 geistshell.test.skipped          <=  1
 geistshell.test.host_skipped     ==  0
+
+# Throughput is measured here too (same step, same parameters), but this platform has no
+# floors yet: the hosted ubuntu-24.04 pool was never measured, and inventing a number is
+# worse than having none. The nightly artifact carries prefill_tps, decode_tps and rss_mb;
+# add floors once a few runs show the range. The thread check stays, so a bench step that
+# silently stops running fails instead of disappearing quietly.
+geistlib.bench.threads           ==  4
