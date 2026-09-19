@@ -15,9 +15,11 @@ DEPS     := $(CURDIR)/build/deps
 ENGINE   := $(DEPS)/geistlib
 # ponytail: fixed at 8. -j32 with ASan builds exhausted memory; raise it once the peak is measured.
 JOBS     ?= 8
-IMAGE    := geistkit-toolchain
-# Container name per working copy: a local run and a CI job would otherwise remove each other's container.
-CONTAINER := geistkit-ci-$(shell printf '%s' '$(CURDIR)' | cksum | cut -d' ' -f1)
+# Image tag and container name per working copy: a local run and a CI job on the same
+# machine would otherwise overwrite each other's image and remove each other's container.
+COPY_ID  := $(shell printf '%s' '$(CURDIR)' | cksum | cut -d' ' -f1)
+IMAGE    := geistkit-toolchain-$(COPY_ID)
+CONTAINER := geistkit-ci-$(COPY_ID)
 RUN      := sh tools/run.sh
 
 # Toolchain: gcc-14 as in the geisten CI, unless CC is given (macOS: clang or brew llvm@19).

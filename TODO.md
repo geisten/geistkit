@@ -352,3 +352,23 @@ ASan-Zähler sind jetzt in `acceptance.d/linux-x86_64-avx512.tsv` (≥ 40 / ≤ 
 - **Lücke:** #415 hat genau diese Datei angefasst (`firstprivate` an zwei `parallel for simd`) und nur den Release geprüft. Der macOS-x86_64-Leg der geistlib-CI enthält offenbar keinen Sanitizer-Build — genau dort ist es durchgerutscht.
 - **In Arbeit:** PR mit dem Fix plus, falls nötig, ein macOS-Sanitizer-Leg in der geistlib-CI.
 - **geistkit danach:** `SHA_geistlib` nachziehen, dann sollten alle sechs Plattformen grün sein, und in `acceptance.d/darwin-x86_64.tsv` die dann gemessenen Zähler eintragen statt der Platzhalter.
+
+---
+
+## 19.09., Nachtrag 2: eigener Runner in Betrieb, clang deckt Neues auf
+
+Der Rechner ist neu gestartet: NVIDIA-Kernel-Modul und Userspace stehen beide auf 595.91.07, Vulkan enumeriert die RTX 2080 Ti. **geistlib#421 ist damit mit allen Checks grün gemergt, erstmals inklusive „Vulkan backend (discrete GPU)“** — die Fremdursache, die bisher jeden PR rot machte. Lock steht auf `0f35be4a` (v0.11.0-67).
+
+Der geistkit-Runner läuft (`AMD_DESKTOP_RUNNER=on`), und der eigene Leg baut jetzt eine Matrix aus `gcc-14` und `clang-19`, wie geist-memory upstream beide Compiler prüft.
+
+**Zwei eigene Fehler dabei behoben:**
+- `make ci` gab `CC` nie in den Container weiter — jede Variante baute mit dem gcc-14-Default.
+- Image-Tag **und** Container-Name waren fest. Lokaler Lauf und CI-Job auf demselben Rechner haben sich gegenseitig das Image überschrieben und den Container entfernt. Beide tragen jetzt einen Hash der Arbeitskopie.
+- Im Image fehlte die zu clang passende OpenMP-Laufzeit: `libomp-dev` (18) ist durch `libomp-19-dev` ersetzt, `libomp-dev` braucht gcc nicht (es nutzt libgomp). Belegt: `clang-19 -fopenmp` baut wieder, gcc-14 unverändert grün.
+
+### F12 – geistlib: clang-19 stürzt auf x86 ab (Repo geistlib), gefunden durch die clang-Variante
+
+- [ ] `src/archs/audio_conformer/audio_linear.c`: clang-19 bricht mit einem internen Fehler ab (exit 70), Pass „X86 DAG->DAG Instruction Selection“, Funktion `@w8a8_avx512vnni.omp_outlined`.
+- **Muster:** Beim OpenMP-Auslagern verliert der Rumpf offenbar die `target`-Attribute, sodass VPDPBUSD in einer Funktion ohne AVX512-VNNI landet. F8 hat dieselbe Datei schon einmal umgebaut („Cannot select VPDPBUSD“), damals für den Nicht-OpenMP-Pfad.
+- **Nicht abgedeckt upstream:** geistlib baut Linux mit gcc; clang-x86 mit OpenMP wird nirgends geprüft.
+- **Wirkung in geistkit:** Der `clang-19`-Leg auf `amd-desktop` bleibt rot, bis das behoben ist.

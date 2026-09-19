@@ -6,7 +6,7 @@ FROM ubuntu:24.04@sha256:224a1869083a311ef3f13648a154ba79832fbef6364d31493642ca0
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
       gcc-14 g++-14 libc6-dev clang-19 libclang-rt-19-dev make git ca-certificates pkg-config \
-      python3 python3-numpy libopenblas-dev libomp-dev libfftw3-dev \
+      python3 python3-numpy libopenblas-dev libomp-19-dev libfftw3-dev \
  && ln -s /usr/bin/gcc-14 /usr/local/bin/gcc \
  && ln -s /usr/bin/gcc-14 /usr/local/bin/cc \
  && ln -s /usr/bin/g++-14 /usr/local/bin/g++ \
