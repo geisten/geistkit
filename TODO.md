@@ -416,7 +416,7 @@ Lock: geistlib `a424d4dd` (v0.11.0-69), geistshell `5c8a9761`, geist-memory `b29
 ### Offen, nach Priorität
 
 - [ ] **P2 Testmodelle:** Qwen3.5-0.8B und BitNet (beide in geistlib SHA-gepinnt) in `versions.mk`, `make fetch-models`, Profil „model“ nächtlich. Erst damit laufen die 24 übersprungenen Unit-, 48 Integrations- und 9 e2e-Tests.
-- [ ] **Pi 5:** Runner für geistkit registrieren, dann `PI5_RUNNER=on`.
+- [ ] **Pi 5:** Runner für geistkit registrieren, dann `PI5_RUNNER=on` — Anleitung und Checkliste in [geistkit#3](https://github.com/geisten/geistkit/issues/3). Das Speicherlimit ist dafür parametrisiert (`MEMORY`, im pi5-Job 6g bzw. Variable `PI5_MEMORY`).
 - [ ] **P3 Produktkriterien** messbar machen (diktat WER, p95, RTF).
 - [ ] **P4 Sicherheit:** Fuzzing für GGUF/safetensors/WAV/Tokenizer, geistshell-Isolation (bwrap/Landlock), reservierte Memory-Namen, `realpath` im Workdir.
 - [ ] Ältere Befunde: flakey `test_cli_device` unter Last, `-j`-Races in geist-memory, doppelter Kommentarblock im geistshell-Makefile, `geist-diktat` pinnt noch v0.10.8, nvim-Issues #19/#20/#24, fremder PR diktat#41.
