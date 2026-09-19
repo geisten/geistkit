@@ -1,19 +1,28 @@
 # MODELS=1 on Linux x86_64 with AVX-512: the model-free counts plus the model-gated suites.
-# Measured on amd-desktop (Ryzen 9 9950X) with Qwen3.5-0.8B and BitNet b1.58 2B-4T present.
+# Measured on amd-desktop (Ryzen 9 9950X) with Qwen3.5-0.8B, BitNet b1.58 2B-4T, the Gemma 4
+# E2B fixture and the audio tower present.
 # Counts are a ratchet: passed may only rise, skipped only fall.
-geistlib.unit.passed             >=  40
-geistlib.unit.skipped            <=  24
-geistlib.asan.passed             >=  40
-geistlib.asan.skipped            <=  24
-# test-int: Qwen3.5 activates test_qwen35_load_int and test_qwen35_e2e_int.
-# 45 still skip, and honestly so: 26 want the Gemma 4 E2B fixture (3.1 GB), 3 the audio tower,
-# 2 Qwen3-0.6B, 2 SmolLM2-360M, the rest safetensors dumps. Lower this by adding fixtures.
-geistlib.int.passed              >=  5
-geistlib.int.skipped             <=  45
+geistlib.unit.passed             >=  44
+geistlib.unit.skipped            <=  20
+# The ASan step shares the clone, so the fixtures raise its counts as well — four more tests
+# now run under AddressSanitizer than in the model-free profile. Measured, not assumed.
+geistlib.asan.passed             >=  44
+geistlib.asan.skipped            <=  20
+# test-int: the Gemma fixture and the audio tower take this from 5 passes to 27.
+# 22 still skip, and honestly so: 7 want safetensors dumps, 2 Qwen3-0.6B, 2 SmolLM2-360M,
+# the rest further audio/vision fixtures. Qwen3 plus SmolLM2 (~1 GB) would add 4 int and 2 e2e.
+#
+# failed == 0 is NOT met today: test_audio_attn_w8a8_parity_int drifts from its reference on
+# this host (1-cos worst 1.582e-01, max|diff| 6.7 for attn+lconv and defaults; attn-only passes).
+# geistlib runs that test on Linux arm64/NEON only, so the x86 AVX-512/VNNI path it takes here
+# has no upstream gate. The requirement stays as it is: a drifting parity test is the defect,
+# and loosening it would hide exactly what this profile exists to find.
+geistlib.int.passed              >=  27
+geistlib.int.skipped             <=  22
 geistlib.int.failed              ==  0
 geistlib.int.error               ==  0
-geistlib.e2e.passed              >=  1
-geistlib.e2e.skipped             <=  8
+geistlib.e2e.passed              >=  4
+geistlib.e2e.skipped             <=  5
 geistlib.e2e.failed              ==  0
 geistlib.e2e.error               ==  0
 geistshell.test.passed           >=  61

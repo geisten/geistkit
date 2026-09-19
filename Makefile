@@ -31,6 +31,10 @@ RUN      := sh tools/run.sh
 # which would delete gguf_artifacts/ on every fetch. MODELS=1 links them back in.
 MODELS     ?= 0
 MODELS_DIR := $(CURDIR)/build/models
+# The Gemma fixture is what most model-gated tests assert against, and the audio tower is
+# what makes audio run at all; geist-diktat's WER test needs both, from GEIST_DIKTAT_DATA.
+# Path as geistlib names it, so link-models puts it where the tests look.
+AUDIO_TOWER := audio_bench/audio_tower.safetensors
 # Throughput measurement (MODELS=1). BitNet activates no pass/fail test — it is geistlib's
 # benchmark model — so this is where its numbers become data. Threads are pinned rather than
 # left to the host: the figure has to be comparable between runs, and 4 also matches the
@@ -61,17 +65,19 @@ fetch-%: FORCE
 # geistlib owns the model pins (fixed HF revision + SHA-256, PR #413), so we call its targets
 # instead of repeating URLs or checksums here. Network step, never part of verify.
 fetch-models: fetch-geistlib
-	$(MAKE) -C $(ENGINE) fetch-qwen35-model fetch-bench-model
+	$(MAKE) -C $(ENGINE) fetch-qwen35-model fetch-bench-model fetch-model fetch-audio-tower
 	mkdir -p $(MODELS_DIR)
 	ln -f $(ENGINE)/gguf_artifacts/*.gguf $(MODELS_DIR)/
+	ln -f $(ENGINE)/$(AUDIO_TOWER) $(MODELS_DIR)/
 
 # Offline: hardlink the kept models back into the freshly fetched clone. Each geistlib test
 # picks the fixture it needs by name from gguf_artifacts/ — forcing GEIST_GGUF_PATH instead
 # hands Gemma-specific tests a foreign model and makes them fail rather than skip.
 link-models:
 	@ls $(MODELS_DIR)/*.gguf >/dev/null 2>&1 || { echo "no models in $(MODELS_DIR): run make fetch-models"; exit 1; }
-	mkdir -p $(ENGINE)/gguf_artifacts
+	mkdir -p $(ENGINE)/gguf_artifacts $(ENGINE)/$(dir $(AUDIO_TOWER))
 	ln -f $(MODELS_DIR)/*.gguf $(ENGINE)/gguf_artifacts/
+	ln -f $(MODELS_DIR)/$(notdir $(AUDIO_TOWER)) $(ENGINE)/$(AUDIO_TOWER)
 
 test: $(addprefix test-,$(PROJECTS))
 
@@ -113,6 +119,13 @@ test-geist-diktat:
 	$(RUN) geist-diktat.build $(DEPS)/geist-diktat $(DIKTAT_MAKE) -j$(JOBS)
 	$(RUN) geist-diktat.test  $(DEPS)/geist-diktat $(DIKTAT_MAKE) test
 	$(RUN) geist-diktat.audit $(DEPS)/geist-diktat $(DIKTAT_MAKE) test-audit
+ifeq ($(MODELS),1)
+	# The one test that hears. It reads model and tower from GEIST_DIKTAT_DATA and its WAV from
+	# its own fixtures, so nothing has to be linked into diktat's engine copy — and nothing may
+	# be: its sync-engine refuses a geistlib/ directory that is not a git checkout. The test
+	# gates itself at 15 % WER, so the step's exit code is the gate; run.sh keeps the number.
+	$(RUN) geist-diktat.e2e   $(DEPS)/geist-diktat env GEIST_DIKTAT_DATA=$(MODELS_DIR) $(DIKTAT_MAKE) test-e2e
+endif
 
 selftest:
 	sh test/verify_test.sh

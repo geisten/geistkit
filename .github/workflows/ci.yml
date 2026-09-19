@@ -105,13 +105,12 @@ jobs:
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
-      # versions.mk pins the engine revision, and that revision carries the model pins,
-      # so the lock file is the honest cache key. One entry of ~1.9 GB, well inside the
-      # repository's 10 GB budget (geistlib's cache thrashing is exactly what to avoid, TODO F10).
-      - uses: actions/cache@v4
-        with:
-          path: build/models
-          key: geistkit-models-${{ hashFiles('versions.mk') }}
+      # No cache for the models, deliberately. With the Gemma fixture and the audio tower the
+      # set is 5.4 GB: one entry eats 54 % of the repository's 10 GB budget, and the next lock
+      # bump adds a second — which is how geistlib thrashed its own cache (TODO F10). Fetching
+      # all four took 76 s on a comparable link, about what restoring 5.4 GB would cost anyway.
+      # Disk on a hosted runner: 5.4 GB models + ~1.2 GB checkouts and build trees + the image,
+      # against ~14 GB free.
       - run: make fetch-models
       - run: make ci MODELS=1 JOBS=4
       - if: always()
