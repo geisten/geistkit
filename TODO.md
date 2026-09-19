@@ -420,3 +420,30 @@ Lock: geistlib `a424d4dd` (v0.11.0-69), geistshell `5c8a9761`, geist-memory `b29
 - [ ] **P3 Produktkriterien** messbar machen (diktat WER, p95, RTF).
 - [ ] **P4 Sicherheit:** Fuzzing für GGUF/safetensors/WAV/Tokenizer, geistshell-Isolation (bwrap/Landlock), reservierte Memory-Namen, `realpath` im Workdir.
 - [ ] Ältere Befunde: flakey `test_cli_device` unter Last, `-j`-Races in geist-memory, doppelter Kommentarblock im geistshell-Makefile, `geist-diktat` pinnt noch v0.10.8, nvim-Issues #19/#20/#24, fremder PR diktat#41.
+
+---
+
+## 19.09.: P2 umgesetzt — Modellprofil, nächtlich
+
+`MODELS=1` schaltet die modellabhängigen Suiten dazu und wechselt auf ein eigenes Vorgabenprofil (`-model`). Ohne Modelle bricht es ab, statt still zu überspringen.
+
+**Gemessen auf amd-desktop (Profil `linux-x86_64-avx512`), Qwen3.5-0.8B und BitNet b1.58 2B-4T:**
+
+| Suite | modellfrei | mit Modellen |
+|---|---|---|
+| geistlib `test-unit` | 40 / 24 / 0 | 40 / 24 / 0 (unverändert) |
+| geistlib `test-int` | 2 / 48 / 0 | **5 / 45 / 0** |
+| geistlib `test-e2e` | 0 / 9 / 0 | **1 / 8 / 0** |
+
+Neu laufen `test_qwen35_load_int`, `test_qwen35_e2e_int` und drei weitere Integrationstests. Laufzeit des vollen Modelllaufs: 291 s gegenüber 264 s modellfrei; Download der zwei Modelle 41 s, 1,9 GB.
+
+**Wichtige Korrektur eines Irrtums:** Ein erzwungenes `GEIST_GGUF_PATH` auf Qwen3.5 macht die Suite **rot**, nicht grün — 1 Unit- und 6 Integrationstests scheitern, weil sie gegen die Gemma-Fixture geschrieben sind (SPM-Tokenizer, Gemmas Chat-Template und EOS, Gemma-Geometrie). Richtig ist, die Modelle nur in `gguf_artifacts/` zu legen: Jeder Test sucht die Fixture, die er braucht, und überspringt sauber, wenn sie fehlt. Genau so macht es geistlibs eigene CI.
+
+**BitNet aktiviert derzeit keinen pass/fail-Test.** Es ist das Benchmark-Modell für `make bench` (Timing, kein Gate). Es wird trotzdem geladen, weil es die Wahl des Users ist und `bench` damit nächtlich möglich wird.
+
+**Was weiterhin übersprungen wird, mit Grund (gemessen, 45 Skips in `test-int`):** 26 warten auf die Gemma-4-E2B-Fixture (3,1 GB), 3 auf den Audio-Tower, 2 auf Qwen3-0.6B (609 MB), 2 auf SmolLM2-360M (386 MB), der Rest auf safetensors-Dumps.
+
+- [ ] **Folgepunkt, bestes Verhältnis:** Qwen3-0.6B und SmolLM2-360M dazunehmen (zusammen ~1 GB, beide SHA-gepinnt) — löst 4 weitere Skips.
+- [ ] **Folgepunkt, größter Block:** Gemma 4 E2B (3,1 GB) löst 26 Skips, treibt den Cache aber auf ~5 GB von 10 GB Budget.
+- [ ] **Folgepunkt:** `make bench` als nächtlicher Messschritt mit Protokoll (BitNet), nicht als Gate.
+- [ ] **Nicht abgedeckt:** geist-memory `bench-model` und `test-e2e` brauchen ein eigenes Embedding-Modell (`bitnet-embedding-0.6b-geist.gguf`), das der nightly-Workflow von geist-memory selbst erzeugt. geist-diktat `test-e2e` braucht Audio-Tower und Gemma.

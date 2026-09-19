@@ -2,8 +2,12 @@
 # builds and verifies them offline.
 #
 #   make fetch    the only step with network: clones at the SHAs from versions.mk, checks tags
+#   make fetch-models  the other network step: the test models, via geistlib's pinned targets
 #   make verify   build, test, compare results against acceptance.tsv (natively, e.g. on macOS)
 #   make ci       image + fetch, then verify inside the toolchain container WITHOUT network (Linux)
+#
+# MODELS=1 adds the model-gated suites (geistlib test-int, test-e2e) and switches to the
+# -model requirement profile. It needs `make fetch-models` first; nightly only.
 #
 # Each consumer gets its engine from build/deps/geistlib (a local clone), at
 # the revision given by ENGINE_<project>, never from the internet at its own pin.
@@ -23,6 +27,10 @@ COPY_ID  := $(shell printf '%s' '$(CURDIR)' | cksum | cut -d' ' -f1)
 IMAGE    := geistkit-toolchain-$(COPY_ID)
 CONTAINER := geistkit-ci-$(COPY_ID)
 RUN      := sh tools/run.sh
+# Test models live OUTSIDE build/deps: fetch-dep.sh wipes each clone with `git clean -fdx`,
+# which would delete gguf_artifacts/ on every fetch. MODELS=1 links them back in.
+MODELS     ?= 0
+MODELS_DIR := $(CURDIR)/build/models
 
 # Toolchain: gcc-14 as in the geisten CI, unless CC is given (macOS: clang or brew llvm@19).
 # Static analysis needs clang: clang-19 in the container; set ANALYZE_CC natively.
@@ -31,7 +39,7 @@ CC := gcc-14
 endif
 ANALYZE_CC ?= clang-19
 
-.PHONY: fetch test verify selftest image ci clean FORCE $(addprefix test-,$(PROJECTS))
+.PHONY: fetch fetch-models link-models test verify selftest image ci clean FORCE $(addprefix test-,$(PROJECTS))
 
 fetch: $(addprefix fetch-,$(PROJECTS))
 
@@ -43,15 +51,34 @@ fetch-%: FORCE
 	for d in $$(find build/deps/$* -mindepth 2 -name .git -prune); do rm -rf "$${d%/.git}"; done
 	test '$(TAG_$*)' = - || test "$$(git -C build/deps/$* rev-parse '$(TAG_$*)^{commit}')" = $(SHA_$*)
 
+# geistlib owns the model pins (fixed HF revision + SHA-256, PR #413), so we call its targets
+# instead of repeating URLs or checksums here. Network step, never part of verify.
+fetch-models: fetch-geistlib
+	$(MAKE) -C $(ENGINE) fetch-qwen35-model fetch-bench-model
+	mkdir -p $(MODELS_DIR)
+	ln -f $(ENGINE)/gguf_artifacts/*.gguf $(MODELS_DIR)/
+
+# Offline: hardlink the kept models back into the freshly fetched clone. Each geistlib test
+# picks the fixture it needs by name from gguf_artifacts/ — forcing GEIST_GGUF_PATH instead
+# hands Gemma-specific tests a foreign model and makes them fail rather than skip.
+link-models:
+	@ls $(MODELS_DIR)/*.gguf >/dev/null 2>&1 || { echo "no models in $(MODELS_DIR): run make fetch-models"; exit 1; }
+	mkdir -p $(ENGINE)/gguf_artifacts
+	ln -f $(MODELS_DIR)/*.gguf $(ENGINE)/gguf_artifacts/
+
 test: $(addprefix test-,$(PROJECTS))
 
 # Flags as in the respective upstream CI (.github/workflows/ci.yml). The build target
 # (linux, pi5, mac, mac-omp) comes from each project's own detection.
-test-geistlib:
+test-geistlib: $(if $(filter 1,$(MODELS)),link-models)
 	$(RUN) geistlib.unit     $(ENGINE) $(MAKE) -j$(JOBS) CC=$(CC) AUTO_FETCH_MODEL=0 test-unit
 	$(RUN) geistlib.py       $(ENGINE) $(MAKE) test-py
 	$(RUN) geistlib.contract $(ENGINE) $(MAKE) -j$(JOBS) CC=$(CC) agent-contract-smoke
 	$(RUN) geistlib.asan     $(ENGINE) $(MAKE) -j$(JOBS) CC=$(CC) MODE=asan AUTO_FETCH_MODEL=0 test-unit
+ifeq ($(MODELS),1)
+	$(RUN) geistlib.int      $(ENGINE) $(MAKE) -j$(JOBS) CC=$(CC) AUTO_FETCH_MODEL=0 test-int
+	$(RUN) geistlib.e2e      $(ENGINE) $(MAKE) -j$(JOBS) CC=$(CC) AUTO_FETCH_MODEL=0 test-e2e
+endif
 
 SHELL_MAKE = $(MAKE) HOST_CC=$(CC) GEIST_REPO=$(ENGINE) GEIST_REF=$(ENGINE_geistshell)
 # sync-engine as a separate step: under -j, objects compile before the clone lands (geist.h missing).
@@ -86,7 +113,8 @@ selftest:
 # acceptance.d/$(PROFILE).tsv. Profile = os-arch, plus -avx512 where geistlib's AVX-512
 # kernels can run (F/BW/DQ/VL; test_q4kx8_gemm_unit skips otherwise). No profile file, no pass.
 AVX512  := $(shell for f in avx512f avx512bw avx512dq avx512vl; do grep -qw $$f /proc/cpuinfo 2>/dev/null || exit 1; done && echo -avx512)
-PROFILE ?= $(shell uname -s | tr A-Z a-z)-$(shell uname -m)$(AVX512)
+# MODELS=1 gets its own profile, so the model run can never be judged against model-free counts.
+PROFILE ?= $(shell uname -s | tr A-Z a-z)-$(shell uname -m)$(AVX512)$(if $(filter 1,$(MODELS)),-model)
 
 verify: selftest
 	@test -f acceptance.d/$(PROFILE).tsv || { echo "no requirements for profile $(PROFILE): acceptance.d/$(PROFILE).tsv missing"; exit 1; }
@@ -106,7 +134,7 @@ image:
 ci: image fetch
 	docker rm -f $(CONTAINER) >/dev/null 2>&1 || true
 	docker run --rm --name $(CONTAINER) --network none --memory $(MEMORY) --user $$(id -u):$$(id -g) -e HOME=/tmp \
-		-v $(CURDIR):$(CURDIR) -w $(CURDIR) $(IMAGE) $(MAKE) verify JOBS=$(JOBS) CC=$(CC) ANALYZE_CC=$(ANALYZE_CC)
+		-v $(CURDIR):$(CURDIR) -w $(CURDIR) $(IMAGE) $(MAKE) verify JOBS=$(JOBS) CC=$(CC) ANALYZE_CC=$(ANALYZE_CC) MODELS=$(MODELS)
 
 clean:
 	rm -rf build

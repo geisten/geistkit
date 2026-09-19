@@ -1,0 +1,21 @@
+# MODELS=1 on Linux x86_64 with AVX-512: the model-free counts plus the model-gated suites.
+# Measured on amd-desktop (Ryzen 9 9950X) with Qwen3.5-0.8B and BitNet b1.58 2B-4T present.
+# Counts are a ratchet: passed may only rise, skipped only fall.
+geistlib.unit.passed             >=  40
+geistlib.unit.skipped            <=  24
+geistlib.asan.passed             >=  40
+geistlib.asan.skipped            <=  24
+# test-int: Qwen3.5 activates test_qwen35_load_int and test_qwen35_e2e_int.
+# 45 still skip, and honestly so: 26 want the Gemma 4 E2B fixture (3.1 GB), 3 the audio tower,
+# 2 Qwen3-0.6B, 2 SmolLM2-360M, the rest safetensors dumps. Lower this by adding fixtures.
+geistlib.int.passed              >=  5
+geistlib.int.skipped             <=  45
+geistlib.int.failed              ==  0
+geistlib.int.error               ==  0
+geistlib.e2e.passed              >=  1
+geistlib.e2e.skipped             <=  8
+geistlib.e2e.failed              ==  0
+geistlib.e2e.error               ==  0
+geistshell.test.passed           >=  61
+geistshell.test.skipped          <=  1
+geistshell.test.host_skipped     ==  0
