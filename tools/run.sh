@@ -23,5 +23,17 @@ rc=$?
         }
         /^test summary:/ {
             for (i = 3; i <= NF; i++) { split($i, kv, "="); printf "%s.%s\t%s\n", k, kv[1], kv[2] }
+        }
+        # geistlib tests/bench_perf_sweep: one JSON object per seq_len, core metrics are the
+        # mean over --repeats. Only the four flat keys below are taken, so the nested
+        # "samples" arrays cannot leak in: their keys simply never match.
+        /"prefill_tps":/ {
+            n = split($0, part, /[,{}]/)
+            for (i = 1; i <= n; i++) {
+                if (split(part[i], kv, ":") != 2) continue
+                gsub(/[" ]/, "", kv[1])
+                if (kv[1] ~ /^(prefill_tps|decode_tps|rss_mb|threads)$/)
+                    printf "%s.%s\t%s\n", k, kv[1], kv[2]
+            }
         }' "$log"
 } >"build/results/$key.tsv"
