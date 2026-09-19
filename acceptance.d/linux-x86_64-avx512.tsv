@@ -1,6 +1,8 @@
 # Linux x86_64 with AVX-512 F/BW/DQ/VL: amd-desktop (Ryzen 9 9950X). Counts are a ratchet.
 geistlib.unit.passed             >=  40
 geistlib.unit.skipped            <=  24   # models/dumps -> F6b
+geistlib.asan.passed             >=  40   # ASan/UBSan with leak detection, since geistlib#414 and #417
+geistlib.asan.skipped            <=  24
 geistshell.test.passed           >=  61
 geistshell.test.skipped          <=  1    # test_cli_gym: no build/gymenv
 geistshell.test.host_skipped     ==  0

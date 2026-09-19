@@ -38,9 +38,11 @@ jobs:
             build/toolchain.txt
             build/logs/
 
+  # Like pi5: enabled by the repository variable once a geistkit runner is registered and online.
+  # Without the gate every push queues a job for 24 h and is then cancelled.
   amd-desktop:
     name: linux x86_64 (amd-desktop, container, offline)
-    if: github.event_name != 'pull_request'
+    if: github.event_name != 'pull_request' && vars.AMD_DESKTOP_RUNNER == 'on'
     runs-on: [self-hosted, Linux, X64, amd-desktop]
     timeout-minutes: 90
     steps:

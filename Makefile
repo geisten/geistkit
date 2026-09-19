@@ -45,7 +45,7 @@ test-geistlib:
 	$(RUN) geistlib.unit     $(ENGINE) $(MAKE) -j$(JOBS) CC=$(CC) AUTO_FETCH_MODEL=0 test-unit
 	$(RUN) geistlib.py       $(ENGINE) $(MAKE) test-py
 	$(RUN) geistlib.contract $(ENGINE) $(MAKE) -j$(JOBS) CC=$(CC) agent-contract-smoke
-	$(RUN) geistlib.asan     $(ENGINE) env ASAN_OPTIONS=detect_leaks=0 $(MAKE) -j$(JOBS) CC=$(CC) MODE=asan AUTO_FETCH_MODEL=0 test-unit
+	$(RUN) geistlib.asan     $(ENGINE) $(MAKE) -j$(JOBS) CC=$(CC) MODE=asan AUTO_FETCH_MODEL=0 test-unit
 
 SHELL_MAKE = $(MAKE) HOST_CC=$(CC) GEIST_REPO=$(ENGINE) GEIST_REF=$(ENGINE_geistshell)
 # sync-engine as a separate step: under -j, objects compile before the clone lands (geist.h missing).
