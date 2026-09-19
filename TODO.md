@@ -329,3 +329,26 @@ ASan-Zähler sind jetzt in `acceptance.d/linux-x86_64-avx512.tsv` (≥ 40 / ≤ 
 - [ ] **P3:** Produktkriterien messbar machen (diktat WER, p95, RTF)
 - [ ] **P4:** Fuzzing, geistshell-Isolation (bwrap/Landlock), reservierte Memory-Namen, `realpath` im Workdir
 - [ ] **Freitag:** `AMD_DESKTOP_RUNNER=on`, Pi-Runner registrieren und `PI5_RUNNER=on`, Rechner neu starten wegen der NVIDIA-Treiber
+
+---
+
+## 19.09., Nachtrag: `main` trägt den Lock-Stand, macOS Intel bleibt rot
+
+**Eigener Fehler, behoben:** Nach dem Merge von geistkit#1 blieb ich lokal auf dem Branch `ci/actions`. Vier Commits (alle Lock-Bumps, die Profile, das grüne Gate) lagen deshalb nie auf `main`, und die nächtlichen Läufe prüften zwei Tage lang den Ursprungsstand. Zusammengeführt über geistkit#2, `main` = `241b023`. Lehre: nach jedem Merge eines eigenen PRs lokal auf `main` zurückwechseln.
+
+**Plattform-Matrix auf diesem Baum (Lauf 35429331508):**
+
+| Plattform | Ergebnis |
+|---|---|
+| Linux x86_64 (Container) | **grün** |
+| Linux arm64 (Container) | **grün** |
+| macOS arm64, Apple clang und llvm@19 | **grün** |
+| macOS Intel, beide Compiler | rot, eine Ursache (F11) |
+
+### F11 – geistlib: Sanitizer-Build auf macOS x86_64 (Repo geistlib), gefunden durch geistkit#2
+
+- [ ] `src/backends/cpu_x86/elementwise.c:71/90/124` im Ziel `mac-omp`, Modus `asan`: clang meldet „loop not vectorized: the optimizer was unable to perform the requested transformation“, und `-Werror` bricht ab. Beide Compiler betroffen, Release ist grün — es trifft nur Sanitizer-Builds mit `-O1`.
+- **Wirkung in geistkit:** vier rote Schritte aus einer Ursache — `geistlib.asan` sowie `geistshell.build`, `.test` und `.baseline`, weil geistshell die Engine im Sanitizer-Modus mitbaut.
+- **Lücke:** #415 hat genau diese Datei angefasst (`firstprivate` an zwei `parallel for simd`) und nur den Release geprüft. Der macOS-x86_64-Leg der geistlib-CI enthält offenbar keinen Sanitizer-Build — genau dort ist es durchgerutscht.
+- **In Arbeit:** PR mit dem Fix plus, falls nötig, ein macOS-Sanitizer-Leg in der geistlib-CI.
+- **geistkit danach:** `SHA_geistlib` nachziehen, dann sollten alle sechs Plattformen grün sein, und in `acceptance.d/darwin-x86_64.tsv` die dann gemessenen Zähler eintragen statt der Platzhalter.
