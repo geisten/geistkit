@@ -2,13 +2,13 @@
 # The SHA is what gets built. The TAG is checked against it after fetch:
 # a moved tag stops the build. TAG = - : upstream has no tag, or main moved past the last one.
 
-# geistlib main (v0.11.0-67-g0f35be4), not the v0.11.0 tag: the ASan, macOS-Intel, C++-header,
+# geistlib main (v0.11.0-69-ga424d4d), not the v0.11.0 tag: the ASan, macOS-Intel, C++-header,
 # AVX-512-dispatch and geist-memory fixes all landed after it, and the tag's tree even
 # lacks tools/fetch-dep.sh. Tags here are cut by the release workflow, not by `git tag`,
 # so a 0.11.1 release is a separate, deliberate step.
 REPO_geistlib       := https://github.com/geisten/geistlib.git
 TAG_geistlib        := -
-SHA_geistlib        := 0f35be4a9afe1da6a1cf781cbe161c2b98c28efe
+SHA_geistlib        := a424d4ddc375c725e93f6a8c4d5fce7851310b5e
 
 REPO_geistshell     := https://github.com/geisten/geistshell.git
 TAG_geistshell      := -
