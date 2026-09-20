@@ -594,3 +594,32 @@ Dazu neuer CI-Leg `audio-parity-x86_64` in geistlib: Der Paritätstest lief nur 
 ### Noch übersprungen (22 int)
 
 7 safetensors-Dumps, 2 Qwen3-0.6B, 2 SmolLM2-360M, Rest Vision-Tower und weitere Audio-Fixturen. Qwen3 plus SmolLM2 wären ~1 GB für 4 int und 2 e2e — bestes verbliebenes Verhältnis.
+
+---
+
+## 20.09.: P4, erste Hälfte — Fuzzing und zwei Härtungen
+
+### P4a Fuzzing ([geistlib#425](https://github.com/geisten/geistlib/pull/425), gemergt)
+
+Zwei Ziele statt vier halbe: **GGUF** (`gguf_open_memory` plus alle Accessoren — die ganze Datei kommt von außen, wird gemappt, und `gguf_reader.c:153` sagt das selbst) und der **Tokenizer** (Vocab, Scores, `token_type`, Merges aus derselben Datei; die GGUF wird direkt nach dem Load freigegeben, damit ein übriggebliebener Zeiger als Use-after-free auffällt statt still zu gelingen).
+
+**Echter Fund, gefixt:** `metadata_kv_count` und `tensor_count` wurden ungeprüft aus dem 24-Byte-Header zu Allokationszahlen. `ckd_mul` verhindert den Überlauf, aber 2^48 Einträge sind eine **legitime** Anforderung von rund 1,5 PB — der Prozess brach ab, statt die Datei abzulehnen. Jetzt gegen die real verbliebenen Bytes begrenzt, per Subtraktion nach §4, mit zwei deterministischen Fällen in `test_io_malformed_unit.c`.
+
+**Zweiter, prozessualer Fund:** `MODE=asan EXTRA_CFLAGS=-fsanitize=fuzzer-no-link` genügt nicht — das Buildsystem hat keinen Flag-Hash, der vorhandene asan-Baum wird wiederverwendet und der Fuzzer läuft **blind** (`cov: 22` nach 24 Millionen Ausführungen). Deshalb ein eigener `MODE=fuzz` mit eigenem Build-Baum.
+
+Gate nach dem geist-memory-Muster: `make MODE=asan fuzz` (3000 Runs je Ziel, fester Seed) unter einer Sekunde, dazu `fuzz-libfuzzer FUZZ_SECONDS=30` im clang-Job mit 4,4 bzw. 4,9 Millionen Ausführungen. `SECURITY.md` ist neu.
+
+**Nicht gefuzzt, mit Begründung:** WAV ist keine Bibliotheks-Angriffsfläche (das RIFF-Laufen steckt nur in `tests/audio_test_util.h`), safetensors hat nur `st_open(path)` und bräuchte pro Eingabe eine temporäre Datei.
+
+- [ ] **Folgepunkt:** Nächtlicher Langlauf lohnt erst mit persistentem Korpus. 30 → 120 Sekunden bewegten lokal 0 bzw. 4 Kanten; was wirkt, ist ein wiederverwendeter Korpus (lokal 476/949 gegen 483/390 kalt). Also `actions/cache` je Ziel, dann Langlauf.
+
+### P4b Härtung ([geistshell#151](https://github.com/geisten/geistshell/pull/151), gemergt)
+
+- **Workdir-Grenze verglich Strings.** Zwei Auswege, beide belegt: Nachbarverzeichnis mit gleichem Präfix (`/scratch/ab` bei erlaubtem `/scratch/a`, ohne Traversal) und unaufgelöste `..` (`/scratch/a/../../etc`). Jetzt `realpath` beidseitig, dann Gleichheit oder Verzeichnisgrenze. Nicht auflösbare Pfade werden abgelehnt: Was nicht existiert, kann man nicht als innerhalb nachweisen.
+- **`memory_save` durfte reservierte Namen schreiben.** `agent_loop.c` liest `lesson-rejected` zurück und legt es dem Modell als Anweisung vor — ein Modell konnte sich selbst eine Lesson schreiben und das Eval-Gate umgehen. Die Ablehnung sitzt jetzt im **Store**, nicht im Executor, deshalb ist die `chat`-Oberfläche mit abgedeckt und eine künftige dritte standardmäßig dicht. Gilt spiegelbildlich für `memory_delete`.
+- **„Angriff 7“ ist jetzt getestet** — und der erste Testentwurf war falsch: Er wurde grün, weil das Denial den Lauf in Schritt 1 beendete und die Lesson nie injiziert wurde. Jetzt zweistufig, mit Gegenprobe. 61 → **62 bestandene Tests**, Journal-Hash unverändert.
+
+### Weiter offen in P4
+
+- [ ] **Echte Isolation der geistshell-Ausführung:** bwrap mit Netz-Namespace, Landlock oder seccomp. Heute nur eigene Prozessgruppe, SIGKILL beim Timeout und `setrlimit` ohne Fehlerprüfung; die Netzsperre hängt am selbst gesetzten `uses_network`-Flag des Modells. Das ist der große Rest und gehört in einen eigenen Schritt.
+- [ ] Fuzz-Korpus-Cache (siehe oben), safetensors sobald `st_open` einen Speicher-Eintrittspunkt hat.
