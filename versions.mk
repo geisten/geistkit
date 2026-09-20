@@ -12,7 +12,7 @@ SHA_geistlib        := a78dd377dcb18ec614480937bc8f44f1091f505c
 
 REPO_geistshell     := https://github.com/geisten/geistshell.git
 TAG_geistshell      := -
-SHA_geistshell      := 431388a433df53ecf9fc18853ab0f7fd8a01fa45
+SHA_geistshell      := 9e54cdd2fc4dfee521d4e5130c36df56fc0dac0e
 
 REPO_geist-memory   := https://github.com/geisten/geist-memory.git
 TAG_geist-memory    := -
